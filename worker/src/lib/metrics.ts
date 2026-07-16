@@ -7,7 +7,7 @@ const DEFAULT_FX_TO_USD: Record<string, number> = {
 
 const PERIOD_MONTHS: Record<string, number> = { P1W: 0.23, P1M: 1, P3M: 3, P6M: 6, P1Y: 12 }
 
-async function fxRates(db: D1Database): Promise<Record<string, number>> {
+export async function fxRates(db: D1Database): Promise<Record<string, number>> {
   const row = await db.prepare("SELECT value FROM config WHERE key = 'fx_rates'").first<{ value: string }>()
   return row ? { ...DEFAULT_FX_TO_USD, ...JSON.parse(row.value) } : DEFAULT_FX_TO_USD
 }

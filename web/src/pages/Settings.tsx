@@ -178,30 +178,43 @@ function AddAppForm({ onAdded }: { onAdded: () => void }) {
 
 function FetchNowSection() {
   const [status, setStatus] = useState('')
-  const [running, setRunning] = useState(false)
+  const [running, setRunning] = useState<string | null>(null)
 
-  const run = async () => {
+  const run = async (kind: 'reviews' | 'sales') => {
     if (running) return
-    setRunning(true)
+    setRunning(kind)
     setStatus('抓取中…')
     try {
-      const res = await api<{ ok: boolean; totalReviews: number }>('/api/jobs/fetch-reviews', { method: 'POST' })
-      setStatus(`完成，当前共 ${res.totalReviews} 条评论`)
+      if (kind === 'reviews') {
+        const res = await api<{ totalReviews: number }>('/api/jobs/fetch-reviews', { method: 'POST' })
+        setStatus(`完成，当前共 ${res.totalReviews} 条评论`)
+      } else {
+        const res = await api<{ fetched: number; totalDays: number; skipped: string }>('/api/jobs/fetch-sales', { method: 'POST' })
+        setStatus(res.skipped || `完成，拉取 ${res.fetched} 份报告，已覆盖 ${res.totalDays} 天`)
+      }
     } catch (e) {
       setStatus(`失败：${e}`)
     } finally {
-      setRunning(false)
+      setRunning(null)
     }
   }
 
   return (
     <>
       <div className="list">
-        <div className="row" onClick={run} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+        <div className="row" onClick={() => run('reviews')} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
           <div className="row-icon tone-accent"><Icon name="refresh" size={17} /></div>
           <div className="main">
-            <div className="title">{running ? '抓取中…' : '立即抓取评论评分'}</div>
+            <div className="title">{running === 'reviews' ? '抓取中…' : '立即抓取评论评分'}</div>
             <div className="detail">平时每 15 分钟自动抓取；新加 App 后可手动触发回填</div>
+          </div>
+          <Icon name="chevronRight" size={18} style={{ color: 'var(--text-lo)' }} />
+        </div>
+        <div className="row" onClick={() => run('sales')} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+          <div className="row-icon tone-success"><Icon name="dollar" size={17} /></div>
+          <div className="main">
+            <div className="title">{running === 'sales' ? '抓取中…' : '立即抓取账单数据'}</div>
+            <div className="detail">销售报告回填 30 天；之后每日自动更新（需 Vendor Number）</div>
           </div>
           <Icon name="chevronRight" size={18} style={{ color: 'var(--text-lo)' }} />
         </div>
@@ -216,6 +229,7 @@ export function SettingsPage() {
   const [ascKeyId, setAscKeyId] = useState('')
   const [ascIssuerId, setAscIssuerId] = useState('')
   const [ascKey, setAscKey] = useState('')
+  const [vendorNumber, setVendorNumber] = useState('')
   const [configKeys, setConfigKeys] = useState<string[]>([])
   const [saved, setSaved] = useState('')
 
@@ -229,6 +243,7 @@ export function SettingsPage() {
     if (ascKeyId) await api('/api/config/asc_key_id', { method: 'PUT', body: JSON.stringify({ value: ascKeyId }) })
     if (ascIssuerId) await api('/api/config/asc_issuer_id', { method: 'PUT', body: JSON.stringify({ value: ascIssuerId }) })
     if (ascKey) await api('/api/config/asc_private_key', { method: 'PUT', body: JSON.stringify({ value: ascKey }) })
+    if (vendorNumber) await api('/api/config/asc_vendor_number', { method: 'PUT', body: JSON.stringify({ value: vendorNumber }) })
     setSaved('已保存')
     load()
   }
@@ -287,6 +302,11 @@ export function SettingsPage() {
       <div className="field">
         <label htmlFor="asc-key">私钥（.p8 文件内容）</label>
         <textarea id="asc-key" rows={4} value={ascKey} onChange={(e) => setAscKey(e.target.value)} />
+      </div>
+      <div className="field">
+        <label htmlFor="asc-vendor">Vendor Number（账单数据用，ASC「付款与财务报告」页可查）</label>
+        <input id="asc-vendor" value={vendorNumber} onChange={(e) => setVendorNumber(e.target.value)}
+          placeholder="8xxxxxxx" inputMode="numeric" autoComplete="off" />
       </div>
       <button className="primary" style={{ width: '100%' }} onClick={saveAsc}>保存凭证</button>
       <p className="muted" style={{ margin: '8px 16px 0' }} role="status">

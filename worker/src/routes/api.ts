@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
-import { getOverview } from '../lib/metrics'
+import { getOverview, fxRates } from '../lib/metrics'
 import { fetchReviewsJob } from '../jobs/fetch-reviews'
 import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
+import { fetchSalesJob } from '../jobs/fetch-sales'
 
 export const api = new Hono<{ Bindings: Env }>()
 
@@ -212,6 +213,33 @@ api.post('/jobs/fetch-reviews', async (c) => {
   await snapshotRatingsJob(c.env.DB)
   const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM reviews').first<{ n: number }>()
   return c.json({ ok: true, totalReviews: count?.n ?? 0 })
+})
+
+// 立即抓取销售报告（账单数据，回填最近 30 天）
+api.post('/jobs/fetch-sales', async (c) => {
+  const result = await fetchSalesJob(c.env.DB)
+  const days = await c.env.DB.prepare('SELECT COUNT(DISTINCT date) AS n FROM sales_daily').first<{ n: number }>()
+  return c.json({ ok: true, ...result, totalDays: days?.n ?? 0 })
+})
+
+// 每日账单聚合（下载量 + 结算收入，折算 USD）
+api.get('/sales/daily', async (c) => {
+  const days = Math.min(Number(c.req.query('days') ?? 30), 365)
+  const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10)
+  const fx = await fxRates(c.env.DB)
+  const rows = await c.env.DB.prepare('SELECT date, product_type, units, proceeds_milli, currency FROM sales_daily WHERE date >= ?')
+    .bind(since)
+    .all<{ date: string; product_type: string; units: number; proceeds_milli: number; currency: string }>()
+
+  const byDate = new Map<string, { downloads: number; iapUnits: number; proceedsUsdMilli: number }>()
+  for (const r of rows.results) {
+    const agg = byDate.get(r.date) ?? { downloads: 0, iapUnits: 0, proceedsUsdMilli: 0 }
+    if (r.product_type.startsWith('1') || r.product_type.startsWith('F')) agg.downloads += r.units
+    else if (r.product_type.startsWith('IA')) agg.iapUnits += r.units
+    agg.proceedsUsdMilli += Math.round(r.proceeds_milli * (fx[r.currency] ?? 0))
+    byDate.set(r.date, agg)
+  }
+  return c.json([...byDate.entries()].map(([date, v]) => ({ date, ...v })).sort((a, b) => a.date.localeCompare(b.date)))
 })
 
 // 手动添加 App（不必等第一条 Store 通知）

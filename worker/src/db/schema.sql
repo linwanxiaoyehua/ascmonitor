@@ -160,6 +160,18 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_pending ON jobs(status, run_after);
 
+-- ASC 每日销售报告（账单口径：Apple 实际结算）
+CREATE TABLE IF NOT EXISTS sales_daily (
+  date TEXT NOT NULL,            -- YYYY-MM-DD（报告日）
+  apple_id TEXT NOT NULL,        -- App Apple ID
+  country TEXT NOT NULL,
+  product_type TEXT NOT NULL,    -- Product Type Identifier（1*=下载 7*=更新 IA*=内购）
+  units INTEGER NOT NULL DEFAULT 0,
+  proceeds_milli INTEGER NOT NULL DEFAULT 0, -- 开发者分成（毫单位，原币种）
+  currency TEXT NOT NULL DEFAULT 'USD',
+  PRIMARY KEY (date, apple_id, country, product_type, currency)
+);
+
 -- 默认告警规则
 INSERT OR IGNORE INTO alert_rules (id, app_id, kind, params_json, channels_json, silence_min, enabled) VALUES
   (1, NULL, 'new_bad_review', '{"max_rating":2}', '["push"]', 0, 1),

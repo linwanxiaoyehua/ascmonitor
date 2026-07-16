@@ -52,6 +52,67 @@ export async function ascJwt(creds: AscCredentials): Promise<string> {
   return `${header}.${payload}.${b64url(sig)}`
 }
 
+export interface SalesReportRow {
+  appleId: string
+  sku: string
+  productType: string
+  units: number
+  developerProceeds: number // 单价（开发者分成）
+  currency: string
+  country: string
+}
+
+/**
+ * 拉取某日销售报告（gzip TSV）。该日无数据时 Apple 返回 404 → 返回 null。
+ * 报告有约 1 天延迟，最早可取一年内。
+ */
+export async function fetchSalesReport(
+  creds: AscCredentials,
+  vendorNumber: string,
+  date: string // YYYY-MM-DD
+): Promise<SalesReportRow[] | null> {
+  const params = new URLSearchParams({
+    'filter[frequency]': 'DAILY',
+    'filter[reportDate]': date,
+    'filter[reportType]': 'SALES',
+    'filter[reportSubType]': 'SUMMARY',
+    'filter[vendorNumber]': vendorNumber,
+  })
+  const res = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, {
+    headers: { Authorization: `Bearer ${await ascJwt(creds)}`, Accept: 'application/a-gzip' },
+  })
+  if (res.status === 404) return null // 无该日数据
+  if (!res.ok) throw new Error(`salesReports ${res.status}: ${await res.text()}`)
+
+  const stream = res.body!.pipeThrough(new DecompressionStream('gzip'))
+  const tsv = await new Response(stream).text()
+  const lines = tsv.split('\n').filter((l) => l.trim())
+  if (lines.length < 2) return []
+
+  const headers = lines[0].split('\t')
+  const col = (name: string) => headers.indexOf(name)
+  const iAppleId = col('Apple Identifier')
+  const iSku = col('SKU')
+  const iType = col('Product Type Identifier')
+  const iUnits = col('Units')
+  const iProceeds = col('Developer Proceeds')
+  const iCurrency = col('Currency of Proceeds')
+  const iCountry = col('Country Code')
+
+  return lines.slice(1).map((line) => {
+    const f = line.split('\t')
+    return {
+      appleId: f[iAppleId],
+      sku: f[iSku],
+      productType: f[iType],
+      units: Number(f[iUnits]) || 0,
+      developerProceeds: Number(f[iProceeds]) || 0,
+      currency: f[iCurrency] || 'USD',
+      country: f[iCountry] || '',
+    }
+  })
+}
+
 export interface AscReview {
   id: string
   attributes: {

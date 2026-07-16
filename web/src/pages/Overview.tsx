@@ -65,14 +65,23 @@ function CardsSkeleton() {
   )
 }
 
+interface SalesDaily {
+  date: string
+  downloads: number
+  iapUnits: number
+  proceedsUsdMilli: number
+}
+
 export function OverviewPage() {
   const [overview, setOverview] = useState<Overview | null>(null)
   const [daily, setDaily] = useState<MetricsDaily[]>([])
+  const [sales, setSales] = useState<SalesDaily[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
     api<Overview>('/api/overview').then(setOverview).catch((e) => setError(String(e)))
     api<MetricsDaily[]>('/api/metrics/daily?days=30').then(setDaily).catch(() => {})
+    api<SalesDaily[]>('/api/sales/daily?days=30').then(setSales).catch(() => {})
   }, [])
 
   if (error) return <div className="error" role="alert">{error}</div>
@@ -102,7 +111,7 @@ export function OverviewPage() {
           <StatCard icon="clock" label="试用中" value={String(overview.trialSubs)} />
         </div>
       )}
-      <h2 className="section-title">近 30 天收入</h2>
+      <h2 className="section-title">近 30 天收入（实时事件）</h2>
       <div className="chart">
         <div className="chart-head">
           <span className="chart-total">{usd(total30)}</span>
@@ -110,6 +119,34 @@ export function OverviewPage() {
         </div>
         <BarChart data={revenueTrend} format={usd} />
       </div>
+
+      {sales.length > 0 && (
+        <>
+          <h2 className="section-title">商店账单（销售报告）</h2>
+          <div className="cards" style={{ marginBottom: 12 }}>
+            <StatCard
+              icon="dollar"
+              label="30 天结算收入"
+              value={usd(sales.reduce((s, d) => s + d.proceedsUsdMilli, 0))}
+              sub="Apple 分成后（约 1 天延迟）"
+              tone="pos"
+            />
+            <StatCard
+              icon="trendingUp"
+              label="30 天下载"
+              value={String(sales.reduce((s, d) => s + d.downloads, 0))}
+              sub={`内购 ${sales.reduce((s, d) => s + d.iapUnits, 0)} 笔`}
+            />
+          </div>
+          <div className="chart">
+            <div className="chart-head">
+              <span className="chart-total num">{sales[sales.length - 1]?.downloads ?? 0}</span>
+              <span className="chart-label">最新一日下载</span>
+            </div>
+            <BarChart data={sales.map((d) => ({ date: d.date, value: d.downloads }))} format={(v) => `${v} 次下载`} />
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -12,8 +12,11 @@ function dateStr(offsetDays: number): string {
 
 export async function fetchSalesJob(db: D1Database): Promise<{ fetched: number; skipped: string }> {
   const creds = await loadAscCredentials(db)
+  if (!creds) return { fetched: 0, skipped: 'ASC 凭证未配置（Key ID / Issuer ID / 私钥）' }
   const vendorRow = await db.prepare("SELECT value FROM config WHERE key = 'asc_vendor_number'").first<{ value: string }>()
-  if (!creds || !vendorRow) return { fetched: 0, skipped: 'ASC 凭证或 Vendor Number 未配置' }
+  if (!vendorRow?.value?.trim()) {
+    return { fetched: 0, skipped: '缺少 Vendor Number：登录 App Store Connect → 付款与财务报告，页面左上角的 8 开头数字，填入设置页保存后重试' }
+  }
   const vendor = vendorRow.value.trim()
 
   // 已入库日期 + 确认过无数据的日期都跳过

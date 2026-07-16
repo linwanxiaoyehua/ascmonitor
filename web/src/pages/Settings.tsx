@@ -109,6 +109,73 @@ function PushSection() {
   )
 }
 
+function AddAppForm({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [bundleId, setBundleId] = useState('')
+  const [name, setName] = useState('')
+  const [appleId, setAppleId] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!bundleId.trim()) return setError('Bundle ID 必填')
+    setSaving(true)
+    setError('')
+    try {
+      await api('/api/apps', {
+        method: 'POST',
+        body: JSON.stringify({ bundle_id: bundleId, name: name || undefined, asc_app_id: appleId || undefined }),
+      })
+      setBundleId('')
+      setName('')
+      setAppleId('')
+      setOpen(false)
+      onAdded()
+    } catch (e) {
+      setError(`添加失败：${e}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="list" style={{ marginTop: 8 }}>
+        <div className="row" onClick={() => setOpen(true)} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+          <div className="row-icon tone-success"><Icon name="plus" size={17} /></div>
+          <div className="main"><div className="title" style={{ color: 'var(--blue)' }}>手动添加 App</div></div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div className="field">
+        <label htmlFor="new-bundle-id">Bundle ID（必填）</label>
+        <input id="new-bundle-id" value={bundleId} onChange={(e) => setBundleId(e.target.value)}
+          placeholder="com.example.app" autoComplete="off" autoCapitalize="none" />
+      </div>
+      <div className="field">
+        <label htmlFor="new-name">名称（可选）</label>
+        <input id="new-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="我的 App" autoComplete="off" />
+      </div>
+      <div className="field">
+        <label htmlFor="new-apple-id">App Apple ID（可选，App Store 链接中 id 后的数字）</label>
+        <input id="new-apple-id" value={appleId} onChange={(e) => setAppleId(e.target.value)}
+          placeholder="1234567890" inputMode="numeric" autoComplete="off" />
+      </div>
+      {error && <div className="error" role="alert" style={{ margin: '0 16px 8px' }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button className="primary" style={{ flex: 1 }} onClick={save} disabled={saving}>
+          {saving ? '添加中…' : '添加'}
+        </button>
+        <button className="ghost" onClick={() => setOpen(false)}>取消</button>
+      </div>
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const [apps, setApps] = useState<AppRow[]>([])
   const [ascKeyId, setAscKeyId] = useState('')
@@ -151,13 +218,7 @@ export function SettingsPage() {
       <PushSection />
 
       <h2 className="section-title">App 列表</h2>
-      {apps.length === 0 ? (
-        <div className="empty">
-          <Icon name="chart" size={36} />
-          <div>暂无 App</div>
-          <span className="muted">收到第一条 Store 通知后自动出现</span>
-        </div>
-      ) : (
+      {apps.length > 0 && (
         <div className="list">
           {apps.map((a) => (
             <div className="row" key={a.id} onClick={() => updateAppId(a)} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
@@ -171,7 +232,10 @@ export function SettingsPage() {
           ))}
         </div>
       )}
-      <p className="muted" style={{ margin: '8px 16px 0' }}>填写 Apple ID 后开始抓取评论评分</p>
+      <AddAppForm onAdded={load} />
+      <p className="muted" style={{ margin: '8px 16px 0' }}>
+        收到 Store 通知的 App 会自动出现；也可手动添加，填写 Apple ID 后开始抓取评论评分
+      </p>
 
       <h2 className="section-title">App Store Connect API 凭证</h2>
       <div className="field">

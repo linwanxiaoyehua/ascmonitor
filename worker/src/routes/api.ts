@@ -204,6 +204,22 @@ api.put('/config/:key', async (c) => {
   return c.json({ ok: true })
 })
 
+// 手动添加 App（不必等第一条 Store 通知）
+api.post('/apps', async (c) => {
+  const body = await c.req.json<{ bundle_id: string; name?: string; asc_app_id?: string }>()
+  if (!body.bundle_id?.trim()) return c.json({ error: 'bundle_id_required' }, 400)
+  const row = await c.env.DB.prepare(
+    `INSERT INTO apps (bundle_id, name, asc_app_id) VALUES (?, ?, ?)
+     ON CONFLICT(bundle_id) DO UPDATE SET
+       name = COALESCE(excluded.name, apps.name),
+       asc_app_id = COALESCE(excluded.asc_app_id, apps.asc_app_id)
+     RETURNING *`
+  )
+    .bind(body.bundle_id.trim(), body.name?.trim() || body.bundle_id.trim(), body.asc_app_id?.trim() || null)
+    .first()
+  return c.json(row)
+})
+
 api.put('/apps/:id', async (c) => {
   const body = await c.req.json<{ name?: string; asc_app_id?: string }>()
   await c.env.DB.prepare('UPDATE apps SET name = COALESCE(?, name), asc_app_id = COALESCE(?, asc_app_id) WHERE id = ?')

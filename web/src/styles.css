@@ -44,7 +44,8 @@ body {
 #root {
   max-width: 700px;
   margin: 0 auto;
-  padding: var(--s2) var(--s4) calc(76px + env(safe-area-inset-bottom));
+  /* 顶部避开状态栏/灵动岛（black-translucent 下内容会顶到屏幕顶） */
+  padding: calc(var(--s2) + env(safe-area-inset-top)) var(--s4) calc(76px + env(safe-area-inset-bottom));
   min-height: 100dvh;
 }
 

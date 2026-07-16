@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react'
 import { getToken, setToken, api } from './lib/api'
+import { Icon, type IconName } from './components/Icon'
 import { OverviewPage } from './pages/Overview'
 import { EventsPage } from './pages/Events'
 import { ReviewsPage } from './pages/Reviews'
 import { AlertsPage } from './pages/Alerts'
 import { SettingsPage } from './pages/Settings'
 
-const TABS = [
-  { key: 'overview', label: '总览', icon: '📊' },
-  { key: 'events', label: '事件', icon: '⚡' },
-  { key: 'reviews', label: '评论', icon: '💬' },
-  { key: 'alerts', label: '告警', icon: '🔔' },
-  { key: 'settings', label: '设置', icon: '⚙️' },
-] as const
-
-type Tab = (typeof TABS)[number]['key']
+const TABS: Array<{ key: string; label: string; icon: IconName }> = [
+  { key: 'overview', label: '总览', icon: 'chart' },
+  { key: 'events', label: '事件', icon: 'activity' },
+  { key: 'reviews', label: '评论', icon: 'message' },
+  { key: 'alerts', label: '告警', icon: 'bell' },
+  { key: 'settings', label: '设置', icon: 'settings' },
+]
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [input, setInput] = useState('')
@@ -46,13 +45,22 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   }
 
   return (
-    <div style={{ paddingTop: 80 }}>
-      <h1 style={{ textAlign: 'center' }}>ASCMonitor</h1>
-      <div className="field">
-        <label>Access Token</label>
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="粘贴 Token" />
+    <div style={{ paddingTop: 96 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, color: 'var(--primary)' }}>
+        <Icon name="chart" size={44} />
       </div>
-      {error && <div className="error">{error}</div>}
+      <h1 className="page-title" style={{ textAlign: 'center' }}>ASCMonitor</h1>
+      <div className="field">
+        <label htmlFor="token-input">Access Token</label>
+        <input
+          id="token-input"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="粘贴 Token"
+          autoComplete="off"
+        />
+      </div>
+      {error && <div className="error" role="alert">{error}</div>}
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="primary" style={{ flex: 1 }} onClick={tryLogin}>登录</button>
         <button className="ghost" onClick={trySetup} disabled={initializing}>首次初始化</button>
@@ -64,7 +72,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 export function App() {
   const [authed, setAuthed] = useState(false)
   const [checking, setChecking] = useState(true)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState('overview')
 
   useEffect(() => {
     if (!getToken()) {
@@ -82,15 +90,22 @@ export function App() {
 
   return (
     <>
-      {tab === 'overview' && <OverviewPage />}
-      {tab === 'events' && <EventsPage />}
-      {tab === 'reviews' && <ReviewsPage />}
-      {tab === 'alerts' && <AlertsPage />}
-      {tab === 'settings' && <SettingsPage />}
-      <nav className="tabbar">
+      <main>
+        {tab === 'overview' && <OverviewPage />}
+        {tab === 'events' && <EventsPage />}
+        {tab === 'reviews' && <ReviewsPage />}
+        {tab === 'alerts' && <AlertsPage />}
+        {tab === 'settings' && <SettingsPage />}
+      </main>
+      <nav className="tabbar" aria-label="主导航">
         {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>
-            <span className="icon">{t.icon}</span>
+          <button
+            key={t.key}
+            className={tab === t.key ? 'active' : ''}
+            aria-current={tab === t.key ? 'page' : undefined}
+            onClick={() => setTab(t.key)}
+          >
+            <Icon name={t.icon} size={22} />
             {t.label}
           </button>
         ))}

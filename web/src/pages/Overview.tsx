@@ -1,31 +1,67 @@
 import { useEffect, useState } from 'react'
 import { api, usd, type Overview, type MetricsDaily } from '../lib/api'
+import { Icon, type IconName } from '../components/Icon'
 
-/** 轻量 SVG 柱状趋势图 */
+/** 轻量 SVG 柱状趋势图：含横向网格线与首末日期轴标 */
 function BarChart({ data, format }: { data: Array<{ date: string; value: number }>; format: (v: number) => string }) {
-  if (!data.length) return <div className="empty">暂无数据</div>
+  if (!data.length) return <div className="muted" style={{ textAlign: 'center', padding: '32px 0' }}>暂无数据，等待第一笔交易</div>
   const max = Math.max(...data.map((d) => d.value), 1)
   const w = 100 / data.length
+  const H = 34
   return (
-    <svg viewBox="0 0 100 40" style={{ width: '100%', height: 120 }} preserveAspectRatio="none">
-      {data.map((d, i) => {
-        const h = (d.value / max) * 36
-        return (
-          <rect
-            key={d.date}
-            x={i * w + w * 0.15}
-            y={40 - h}
-            width={w * 0.7}
-            height={h}
-            rx={0.8}
-            fill="var(--accent)"
-            opacity={i === data.length - 1 ? 1 : 0.55}
-          >
-            <title>{`${d.date}: ${format(d.value)}`}</title>
-          </rect>
-        )
-      })}
-    </svg>
+    <>
+      <svg viewBox="0 0 100 40" style={{ width: '100%', height: 130, display: 'block' }} preserveAspectRatio="none" role="img"
+        aria-label={`近 ${data.length} 天收入趋势，最高 ${format(max)}`}>
+        {[0.25, 0.5, 0.75].map((f) => (
+          <line key={f} className="chart-grid" x1="0" x2="100" y1={H - H * f + 2} y2={H - H * f + 2} />
+        ))}
+        {data.map((d, i) => {
+          const h = Math.max((d.value / max) * H, d.value > 0 ? 0.6 : 0)
+          return (
+            <rect
+              key={d.date}
+              className={`chart-bar${i === data.length - 1 ? ' last' : ''}`}
+              x={i * w + w * 0.18}
+              y={H - h + 2}
+              width={w * 0.64}
+              height={h}
+              rx={Math.min(w * 0.32, 1)}
+            >
+              <title>{`${d.date}: ${format(d.value)}`}</title>
+            </rect>
+          )
+        })}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        <span className="muted num">{data[0].date.slice(5)}</span>
+        <span className="muted num">{data[data.length - 1].date.slice(5)}</span>
+      </div>
+    </>
+  )
+}
+
+function StatCard({
+  icon, label, value, sub, tone,
+}: { icon: IconName; label: string; value: string; sub?: string; tone?: 'pos' }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <Icon name={icon} size={14} />
+        {label}
+      </div>
+      <div className={`value${tone ? ` ${tone}` : ''}`}>{value}</div>
+      {sub && <div className="sub">{sub}</div>}
+    </div>
+  )
+}
+
+function CardsSkeleton() {
+  return (
+    <div className="cards" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="skeleton" style={{ height: 96 }} />
+      ))}
+    </div>
   )
 }
 
@@ -39,40 +75,39 @@ export function OverviewPage() {
     api<MetricsDaily[]>('/api/metrics/daily?days=30').then(setDaily).catch(() => {})
   }, [])
 
-  if (error) return <div className="error">{error}</div>
-  if (!overview) return <div className="empty">加载中…</div>
+  if (error) return <div className="error" role="alert">{error}</div>
 
   // 多 App 时按日期合并
   const byDate = new Map<string, number>()
   for (const d of daily) byDate.set(d.date, (byDate.get(d.date) ?? 0) + d.revenue_milli)
   const revenueTrend = [...byDate.entries()].map(([date, value]) => ({ date, value }))
+  const total30 = revenueTrend.reduce((s, d) => s + d.value, 0)
 
   return (
     <div>
-      <h1>总览</h1>
-      <div className="cards">
-        <div className="card">
-          <div className="label">今日收入</div>
-          <div className="value" style={{ color: 'var(--green)' }}>{usd(overview.todayRevenueUsdMilli)}</div>
-          <div className="sub">新订 {overview.todayNewSubs} · 续费 {overview.todayRenewals} · 退款 {overview.todayRefunds}</div>
+      <h1 className="page-title">总览</h1>
+      {!overview ? (
+        <CardsSkeleton />
+      ) : (
+        <div className="cards">
+          <StatCard
+            icon="dollar"
+            label="今日收入"
+            value={usd(overview.todayRevenueUsdMilli)}
+            sub={`新订 ${overview.todayNewSubs} · 续费 ${overview.todayRenewals} · 退款 ${overview.todayRefunds}`}
+            tone="pos"
+          />
+          <StatCard icon="trendingUp" label="MRR" value={usd(overview.mrrUsdMilli)} sub={`ARR ${usd(overview.mrrUsdMilli * 12)}`} />
+          <StatCard icon="users" label="活跃订阅" value={String(overview.activeSubs)} sub={`已关自动续费 ${overview.autoRenewOffCount}`} />
+          <StatCard icon="clock" label="试用中" value={String(overview.trialSubs)} />
         </div>
-        <div className="card">
-          <div className="label">MRR</div>
-          <div className="value">{usd(overview.mrrUsdMilli)}</div>
-          <div className="sub">ARR {usd(overview.mrrUsdMilli * 12)}</div>
-        </div>
-        <div className="card">
-          <div className="label">活跃订阅</div>
-          <div className="value">{overview.activeSubs}</div>
-          <div className="sub">已关自动续费 {overview.autoRenewOffCount}</div>
-        </div>
-        <div className="card">
-          <div className="label">试用中</div>
-          <div className="value">{overview.trialSubs}</div>
-        </div>
-      </div>
-      <h2>近 30 天收入</h2>
+      )}
+      <h2 className="section-title">近 30 天收入</h2>
       <div className="chart">
+        <div className="chart-head">
+          <span className="chart-total">{usd(total30)}</span>
+          <span className="chart-label">30 天合计</span>
+        </div>
         <BarChart data={revenueTrend} format={usd} />
       </div>
     </div>

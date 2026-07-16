@@ -1,7 +1,7 @@
 // ASC 销售报告抓取（每日 cron + 手动触发回填）
 // 报告约有 1 天延迟；从昨天起往前补，最多回填 30 天，已入库的日期跳过
 
-import { loadAscCredentials, fetchSalesReport } from '../lib/asc-api'
+import { loadAscCredentials, fetchSalesReport, fetchSubscriptionReport, type AscCredentials } from '../lib/asc-api'
 
 const BACKFILL_DAYS = 30
 const MAX_REPORTS_PER_RUN = 25 // 子请求预算保护
@@ -61,6 +61,9 @@ export async function fetchSalesJob(db: D1Database): Promise<{ fetched: number; 
     }
   }
 
+  // 订阅状态快照：取最近一份可用的（报告约 1 天延迟，最多回看 3 天）
+  await fetchSubsSnapshot(db, creds, vendor)
+
   // 保留最近 60 天的空日期标记，防止无限增长
   const cutoff = dateStr(60)
   await db
@@ -69,4 +72,30 @@ export async function fetchSalesJob(db: D1Database): Promise<{ fetched: number; 
     .run()
 
   return { fetched, skipped: '' }
+}
+
+async function fetchSubsSnapshot(db: D1Database, creds: AscCredentials, vendor: string): Promise<void> {
+  for (let d = 1; d <= 3; d++) {
+    const date = dateStr(d)
+    const exists = await db.prepare('SELECT 1 FROM subs_snapshot_daily WHERE date = ? LIMIT 1').bind(date).first()
+    if (exists) return
+    try {
+      const rows = await fetchSubscriptionReport(creds, vendor, date)
+      if (!rows?.length) continue
+      for (const r of rows) {
+        await db
+          .prepare(
+            `INSERT INTO subs_snapshot_daily (date, apple_id, subscription_name, active, trials)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(date, apple_id, subscription_name) DO UPDATE SET
+               active = excluded.active, trials = excluded.trials`
+          )
+          .bind(date, r.appAppleId, r.subscriptionName, r.activeStandard + r.activeIntroPaid, r.activeTrial)
+          .run()
+      }
+      return
+    } catch (err) {
+      console.error(`subs snapshot ${date} failed:`, err)
+    }
+  }
 }

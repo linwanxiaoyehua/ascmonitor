@@ -39,6 +39,8 @@ export interface Overview {
   todayRenewals: number
   todayRefunds: number
   autoRenewOffCount: number
+  /** ASC 订阅报告快照（补全 Webhook 前的存量） */
+  snapshot: { date: string; active: number; trials: number } | null
 }
 
 export interface AppRow {

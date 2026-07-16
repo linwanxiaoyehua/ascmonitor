@@ -113,6 +113,64 @@ export async function fetchSalesReport(
   })
 }
 
+export interface SubscriptionReportRow {
+  appAppleId: string
+  subscriptionName: string
+  activeStandard: number
+  activeTrial: number
+  activeIntroPaid: number
+}
+
+/** 拉取某日订阅状态报告（截至该日的活跃订阅快照）。无数据返回 null。 */
+export async function fetchSubscriptionReport(
+  creds: AscCredentials,
+  vendorNumber: string,
+  date: string
+): Promise<SubscriptionReportRow[] | null> {
+  const tryVersion = async (version: string) => {
+    const params = new URLSearchParams({
+      'filter[frequency]': 'DAILY',
+      'filter[reportDate]': date,
+      'filter[reportType]': 'SUBSCRIPTION',
+      'filter[reportSubType]': 'SUMMARY',
+      'filter[vendorNumber]': vendorNumber,
+      'filter[version]': version,
+    })
+    return fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, {
+      headers: { Authorization: `Bearer ${await ascJwt(creds)}`, Accept: 'application/a-gzip' },
+    })
+  }
+  let res = await tryVersion('1_4')
+  if (res.status === 400) res = await tryVersion('1_3')
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`subscriptionReport ${res.status}: ${await res.text()}`)
+
+  const tsv = await new Response(res.body!.pipeThrough(new DecompressionStream('gzip'))).text()
+  const lines = tsv.split('\n').filter((l) => l.trim())
+  if (lines.length < 2) return []
+
+  const headers = lines[0].split('\t')
+  const col = (name: string) => headers.indexOf(name)
+  const num = (f: string[], i: number) => (i >= 0 ? Number(f[i]) || 0 : 0)
+  const iAppleId = col('App Apple ID')
+  const iName = col('Subscription Name')
+  const iStandard = col('Active Standard Price Subscriptions')
+  const iTrial = col('Active Free Trial Introductory Offer Subscriptions')
+  const iPayUpFront = col('Active Pay Up Front Introductory Offer Subscriptions')
+  const iPayAsYouGo = col('Active Pay As You Go Introductory Offer Subscriptions')
+
+  return lines.slice(1).map((line) => {
+    const f = line.split('\t')
+    return {
+      appAppleId: f[iAppleId] ?? '',
+      subscriptionName: iName >= 0 ? f[iName] : '',
+      activeStandard: num(f, iStandard),
+      activeTrial: num(f, iTrial),
+      activeIntroPaid: num(f, iPayUpFront) + num(f, iPayAsYouGo),
+    }
+  })
+}
+
 export interface AscReview {
   id: string
   attributes: {

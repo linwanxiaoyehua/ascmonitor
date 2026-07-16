@@ -107,8 +107,26 @@ export function OverviewPage() {
             tone="pos"
           />
           <StatCard icon="trendingUp" label="MRR" value={usd(overview.mrrUsdMilli)} sub={`ARR ${usd(overview.mrrUsdMilli * 12)}`} />
-          <StatCard icon="users" label="活跃订阅" value={String(overview.activeSubs)} sub={`已关自动续费 ${overview.autoRenewOffCount}`} />
-          <StatCard icon="clock" label="试用中" value={String(overview.trialSubs)} />
+          <StatCard
+            icon="users"
+            label="活跃订阅"
+            value={String(Math.max(overview.activeSubs, overview.snapshot?.active ?? 0))}
+            sub={
+              overview.snapshot && overview.snapshot.active > overview.activeSubs
+                ? `截至 ${overview.snapshot.date.slice(5)}（ASC 报告）`
+                : `已关自动续费 ${overview.autoRenewOffCount}`
+            }
+          />
+          <StatCard
+            icon="clock"
+            label="试用中"
+            value={String(Math.max(overview.trialSubs, overview.snapshot?.trials ?? 0))}
+            sub={
+              overview.snapshot && overview.snapshot.trials > overview.trialSubs
+                ? `截至 ${overview.snapshot.date.slice(5)}（ASC 报告）`
+                : undefined
+            }
+          />
         </div>
       )}
       <h2 className="section-title">近 30 天收入（实时事件）</h2>

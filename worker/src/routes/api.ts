@@ -36,7 +36,13 @@ api.get('/apps', async (c) => {
 
 api.get('/overview', async (c) => {
   const appId = c.req.query('app_id')
-  return c.json(await getOverview(c.env.DB, appId ? Number(appId) : undefined))
+  const overview = await getOverview(c.env.DB, appId ? Number(appId) : undefined)
+  // 最近一份 ASC 订阅快照（补全 Webhook 上线前的存量订阅）
+  const snapshot = await c.env.DB.prepare(
+    `SELECT date, SUM(active) AS active, SUM(trials) AS trials FROM subs_snapshot_daily
+     WHERE date = (SELECT MAX(date) FROM subs_snapshot_daily) GROUP BY date`
+  ).first<{ date: string; active: number; trials: number }>()
+  return c.json({ ...overview, snapshot: snapshot ?? null })
 })
 
 // 事件流（分页，基于 received_at 游标）

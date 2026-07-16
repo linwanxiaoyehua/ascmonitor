@@ -172,6 +172,16 @@ CREATE TABLE IF NOT EXISTS sales_daily (
   PRIMARY KEY (date, apple_id, country, product_type, currency)
 );
 
+-- ASC 订阅状态日快照（补全 Webhook 上线前的存量订阅）
+CREATE TABLE IF NOT EXISTS subs_snapshot_daily (
+  date TEXT NOT NULL,
+  apple_id TEXT NOT NULL,
+  subscription_name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 0,   -- 标准价 + 已付费介绍价
+  trials INTEGER NOT NULL DEFAULT 0,   -- 免费试用中
+  PRIMARY KEY (date, apple_id, subscription_name)
+);
+
 -- 默认告警规则
 INSERT OR IGNORE INTO alert_rules (id, app_id, kind, params_json, channels_json, silence_min, enabled) VALUES
   (1, NULL, 'new_bad_review', '{"max_rating":2}', '["push"]', 0, 1),

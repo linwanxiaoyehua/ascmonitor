@@ -176,6 +176,41 @@ function AddAppForm({ onAdded }: { onAdded: () => void }) {
   )
 }
 
+function FetchNowSection() {
+  const [status, setStatus] = useState('')
+  const [running, setRunning] = useState(false)
+
+  const run = async () => {
+    if (running) return
+    setRunning(true)
+    setStatus('抓取中…')
+    try {
+      const res = await api<{ ok: boolean; totalReviews: number }>('/api/jobs/fetch-reviews', { method: 'POST' })
+      setStatus(`完成，当前共 ${res.totalReviews} 条评论`)
+    } catch (e) {
+      setStatus(`失败：${e}`)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="list">
+        <div className="row" onClick={run} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+          <div className="row-icon tone-accent"><Icon name="refresh" size={17} /></div>
+          <div className="main">
+            <div className="title">{running ? '抓取中…' : '立即抓取评论评分'}</div>
+            <div className="detail">平时每 15 分钟自动抓取；新加 App 后可手动触发回填</div>
+          </div>
+          <Icon name="chevronRight" size={18} style={{ color: 'var(--text-lo)' }} />
+        </div>
+      </div>
+      {status && <p className="muted" style={{ margin: '8px 16px 0' }} role="status">{status}</p>}
+    </>
+  )
+}
+
 export function SettingsPage() {
   const [apps, setApps] = useState<AppRow[]>([])
   const [ascKeyId, setAscKeyId] = useState('')
@@ -236,6 +271,9 @@ export function SettingsPage() {
       <p className="muted" style={{ margin: '8px 16px 0' }}>
         收到 Store 通知的 App 会自动出现；也可手动添加，填写 Apple ID 后开始抓取评论评分
       </p>
+
+      <h2 className="section-title">评论抓取</h2>
+      <FetchNowSection />
 
       <h2 className="section-title">App Store Connect API 凭证</h2>
       <div className="field">

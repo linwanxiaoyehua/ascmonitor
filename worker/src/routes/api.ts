@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
 import { getOverview } from '../lib/metrics'
+import { fetchReviewsJob } from '../jobs/fetch-reviews'
+import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
 
 export const api = new Hono<{ Bindings: Env }>()
 
@@ -202,6 +204,14 @@ api.put('/config/:key', async (c) => {
     .bind(key, value)
     .run()
   return c.json({ ok: true })
+})
+
+// 立即抓取评论评分（不等 cron）
+api.post('/jobs/fetch-reviews', async (c) => {
+  await fetchReviewsJob(c.env.DB)
+  await snapshotRatingsJob(c.env.DB)
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM reviews').first<{ n: number }>()
+  return c.json({ ok: true, totalReviews: count?.n ?? 0 })
 })
 
 // 手动添加 App（不必等第一条 Store 通知）

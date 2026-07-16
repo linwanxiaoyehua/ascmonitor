@@ -10,6 +10,47 @@ function b64urlToUint8(input: string): Uint8Array {
   return bytes
 }
 
+function WebhookUrlSection() {
+  const [copied, setCopied] = useState(false)
+  const url = `${location.origin}/webhook/assn`
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // 旧浏览器 fallback
+      const ta = document.createElement('textarea')
+      ta.value = url
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <>
+      <div className="list">
+        <div className="row" onClick={copy} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+          <div className={`row-icon ${copied ? 'tone-success' : 'tone-accent'}`}>
+            <Icon name={copied ? 'check' : 'zap'} size={17} />
+          </div>
+          <div className="main">
+            <div className="title">{copied ? '已复制' : '服务器通知 URL'}</div>
+            <div className="detail num">{url}</div>
+          </div>
+          <span style={{ color: 'var(--blue)', fontSize: 15, flex: 'none' }}>复制</span>
+        </div>
+      </div>
+      <p className="muted" style={{ margin: '8px 16px 0' }}>
+        粘贴到 App Store Connect → App 信息 → App Store 服务器通知 → 生产服务器 URL（选择 Version 2）
+      </p>
+    </>
+  )
+}
+
 function PushSection() {
   const [status, setStatus] = useState('')
   const supported = 'serviceWorker' in navigator && 'PushManager' in window
@@ -102,6 +143,9 @@ export function SettingsPage() {
   return (
     <div>
       <h1 className="page-title">设置</h1>
+
+      <h2 className="section-title">App Store 通知接入</h2>
+      <WebhookUrlSection />
 
       <h2 className="section-title">推送通知</h2>
       <PushSection />

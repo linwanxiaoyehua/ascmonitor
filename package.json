@@ -1,0 +1,20 @@
+{
+  "name": "ascmonitor",
+  "private": true,
+  "workspaces": [
+    "worker",
+    "web"
+  ],
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "deploy": "npm run build -w web && wrangler deploy",
+    "test": "npm run test -w worker",
+    "db:migrate:local": "wrangler d1 execute ascmonitor --local --file=worker/src/db/schema.sql",
+    "db:migrate:remote": "wrangler d1 execute ascmonitor --remote --file=worker/src/db/schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.24.0"
+  }
+}

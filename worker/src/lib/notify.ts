@@ -2,10 +2,16 @@
 
 import { sendWebPush } from './webpush'
 
-export async function notify(db: D1Database, kind: string, title: string, body: string, ruleId?: number): Promise<void> {
+export async function notify(
+  db: D1Database,
+  kind: string,
+  title: string,
+  body: string,
+  opts?: { ruleId?: number; icon?: string | null }
+): Promise<void> {
   const event = await db
     .prepare('INSERT INTO alert_events (rule_id, kind, title, body) VALUES (?, ?, ?, ?) RETURNING id')
-    .bind(ruleId ?? null, kind, title, body)
+    .bind(opts?.ruleId ?? null, kind, title, body)
     .first<{ id: number }>()
 
   const subs = await db.prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions').all<{
@@ -21,7 +27,7 @@ export async function notify(db: D1Database, kind: string, title: string, body: 
   let delivered = false
   for (const sub of subs.results) {
     try {
-      await sendWebPush(JSON.parse(vapid.value), sub, JSON.stringify({ title, body, kind }))
+      await sendWebPush(JSON.parse(vapid.value), sub, JSON.stringify({ title, body, kind, icon: opts?.icon ?? undefined }))
       delivered = true
     } catch (err) {
       // 410/404 = 订阅失效，清理

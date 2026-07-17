@@ -9,9 +9,10 @@ self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? { title: 'ASCMonitor', body: '' }
   event.waitUntil(
     self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon-192.png',
+      // 有 App 图标就用真实图标，通知一眼认出是哪个 App
+      icon: data.icon || '/icon-192.png',
       badge: '/icon-192.png',
+      body: data.body,
       data,
     })
   )

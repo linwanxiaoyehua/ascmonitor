@@ -36,6 +36,27 @@ export async function fetchRssReviews(ascAppId: string, country: string, page = 
     }))
 }
 
+export interface AppInfo {
+  trackId: number
+  trackName: string
+  artworkUrl: string | null
+}
+
+/** Lookup：按 bundleId 或数字 ID 查 App 基本信息（名称 / 图标 / Apple ID） */
+export async function lookupAppInfo(query: { bundleId?: string; id?: string }, country = 'us'): Promise<AppInfo | null> {
+  const param = query.bundleId ? `bundleId=${encodeURIComponent(query.bundleId)}` : `id=${query.id}`
+  const res = await fetch(`https://itunes.apple.com/lookup?${param}&country=${country}`, { headers: { 'User-Agent': UA } })
+  if (!res.ok) return null
+  const json = (await res.json()) as { resultCount: number; results: Array<Record<string, unknown>> }
+  if (!json.resultCount) return null
+  const app = json.results[0]
+  return {
+    trackId: app.trackId as number,
+    trackName: (app.trackName as string) ?? '',
+    artworkUrl: (app.artworkUrl100 as string) ?? (app.artworkUrl512 as string) ?? null,
+  }
+}
+
 export interface LookupResult {
   averageUserRating: number
   userRatingCount: number

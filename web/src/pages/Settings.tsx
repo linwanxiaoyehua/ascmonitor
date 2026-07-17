@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type AppRow } from '../lib/api'
 import { Icon } from '../components/Icon'
+import { AppIcon } from '../components/AppIcon'
 
 function b64urlToUint8(input: string): Uint8Array {
   const b64 = input.replace(/-/g, '+').replace(/_/g, '/')
@@ -272,7 +273,7 @@ export function SettingsPage() {
         <div className="list">
           {apps.map((a) => (
             <div className="row" key={a.id} onClick={() => updateAppId(a)} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
-              <div className="row-icon tone-primary"><Icon name="chart" size={17} /></div>
+              <AppIcon url={a.icon_url} name={a.name} size={30} />
               <div className="main">
                 <div className="title">{a.name}</div>
                 <div className="detail">{a.bundle_id} · Apple ID: {a.asc_app_id ?? '未设置'}</div>

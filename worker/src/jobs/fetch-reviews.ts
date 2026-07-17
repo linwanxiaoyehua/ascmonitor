@@ -7,6 +7,7 @@ import { loadAscCredentials, fetchCustomerReviews, type AscCredentials } from '.
 import { fetchRssReviews } from '../lib/itunes'
 import { tagReview } from '../lib/tagger'
 import { evaluateNewReview } from '../lib/alerts'
+import { backfillAppInfo } from '../lib/app-enrich'
 
 const REQUEST_BUDGET = 40
 const RSS_MAX_PAGES = 10
@@ -53,6 +54,9 @@ async function saveReview(db: D1Database, r: NewReview): Promise<boolean> {
 }
 
 export async function fetchReviewsJob(db: D1Database): Promise<void> {
+  // 顺带回填缺失的 App 图标 / 名称（每轮最多 3 个，控制子请求预算）
+  await backfillAppInfo(db, 3)
+
   const apps = await db
     .prepare('SELECT id, asc_app_id FROM apps WHERE asc_app_id IS NOT NULL')
     .all<{ id: number; asc_app_id: string }>()

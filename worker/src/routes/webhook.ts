@@ -54,7 +54,7 @@ webhook.post('/assn', async (c) => {
 
   // 沙盒事件入库但不推送
   if (event.notify && payload.data?.environment !== 'Sandbox') {
-    c.executionCtx.waitUntil(notify(c.env.DB, 'transaction', event.title, event.body))
+    c.executionCtx.waitUntil(notify(c.env.DB, 'transaction', event.title, event.body, { icon: event.icon }))
   }
 
   return c.text('OK', 200)

@@ -129,6 +129,34 @@ body {
 .row-icon.tone-danger  { background: var(--red); }
 .row-icon.tone-accent  { background: var(--orange); }
 
+/* App 真实图标（iTunes 自动获取）；fallback 为首字符占位 */
+.app-icon {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--fill);
+}
+.app-icon-fallback {
+  display: inline-grid; place-items: center;
+  color: var(--text-mid);
+  font-weight: 600;
+}
+/* 图标 + 事件类型角标（iOS 通知风格） */
+.icon-stack { position: relative; flex: none; display: grid; place-items: center; }
+.icon-stack .icon-badge {
+  position: absolute; right: -5px; bottom: -5px;
+  width: 17px; height: 17px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff;
+  background: var(--fill);
+  border: 2px solid var(--surface);
+}
+.icon-stack .icon-badge.tone-success { background: var(--green); }
+.icon-stack .icon-badge.tone-primary { background: var(--blue); }
+.icon-stack .icon-badge.tone-danger  { background: var(--red); }
+.icon-stack .icon-badge.tone-accent  { background: var(--orange); }
+
 .row .main { flex: 1; min-width: 0; }
 .row .title { font-size: 16px; font-weight: 400; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .row .detail {

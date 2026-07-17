@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS apps (
   bundle_id TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   asc_app_id TEXT,              -- App Store Connect / iTunes 数字 ID（评论抓取用）
+  icon_url TEXT,                -- App 图标（iTunes Lookup 自动获取）
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
 

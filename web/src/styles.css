@@ -28,9 +28,10 @@
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-/* iOS 浅色分组列表：跟随系统外观 */
+/* iOS 浅色分组列表令牌。
+   默认跟随系统外观；设置页可手动固定 —— :root[data-theme='light'|'dark'] 覆盖 */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']) {
     --bg: #f2f2f7;
     --surface: #ffffff;
     --surface-2: #e5e5ea;
@@ -48,12 +49,37 @@
 
     --separator: rgba(60, 60, 67, 0.29);
     --tabbar-bg: rgba(249, 249, 249, 0.92);
+    color-scheme: light;
   }
+}
+:root[data-theme='light'] {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface-2: #e5e5ea;
+  --fill: #d1d1d6;
+
+  --text-hi: #000000;
+  --text-mid: rgba(60, 60, 67, 0.6);
+  --text-lo: rgba(60, 60, 67, 0.3);
+
+  --blue: #007aff;
+  --green: #34c759;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+
+  --separator: rgba(60, 60, 67, 0.29);
+  --tabbar-bg: rgba(249, 249, 249, 0.92);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { color-scheme: light dark; }
+html { color-scheme: dark; }
+html[data-theme='light'] { color-scheme: light; }
+@media (prefers-color-scheme: light) {
+  html:not([data-theme='dark']) { color-scheme: light; }
+}
 
 body {
   background: var(--bg);

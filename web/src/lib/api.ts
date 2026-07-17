@@ -126,6 +126,21 @@ export interface TimelineRow {
   received_at: number | null
 }
 
+export interface PurchaseRow {
+  transaction_id: string
+  product_id: string
+  type: string
+  price_milli: number | null
+  currency: string | null
+  country: string | null
+  purchase_date: number | null
+  event_type: string
+  refunded: number
+  app_name: string | null
+  app_icon: string | null
+  app_bundle_id: string | null
+}
+
 export interface RatingSnapshot {
   app_id: number
   country: string

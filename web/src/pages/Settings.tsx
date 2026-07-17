@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, type AppRow } from '../lib/api'
 import { Icon } from '../components/Icon'
 import { AppIcon } from '../components/AppIcon'
+import { getTheme, setTheme, type Theme } from '../lib/theme'
 
 function b64urlToUint8(input: string): Uint8Array {
   const b64 = input.replace(/-/g, '+').replace(/_/g, '/')
@@ -9,6 +10,37 @@ function b64urlToUint8(input: string): Uint8Array {
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return bytes
+}
+
+const THEME_OPTIONS: Array<{ value: Theme; label: string }> = [
+  { value: 'auto', label: '跟随系统' },
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+]
+
+function ThemeSection() {
+  const [theme, setThemeState] = useState<Theme>(getTheme())
+
+  const choose = (t: Theme) => {
+    setTheme(t)
+    setThemeState(t)
+  }
+
+  return (
+    <div className="filters" role="radiogroup" aria-label="外观">
+      {THEME_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          role="radio"
+          aria-checked={theme === o.value}
+          className={theme === o.value ? 'active' : ''}
+          onClick={() => choose(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function WebhookUrlSection() {
@@ -261,6 +293,9 @@ export function SettingsPage() {
   return (
     <div>
       <h1 className="page-title">设置</h1>
+
+      <h2 className="section-title">外观</h2>
+      <ThemeSection />
 
       <h2 className="section-title">App Store 通知接入</h2>
       <WebhookUrlSection />

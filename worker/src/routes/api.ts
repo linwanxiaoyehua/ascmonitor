@@ -117,6 +117,27 @@ api.get('/subscriptions', async (c) => {
   return c.json(rows.results)
 })
 
+// 一次性购买流水（非自动续订订阅的交易：买断 / 消耗型 / 非续订订阅）
+api.get('/purchases', async (c) => {
+  const before = Number(c.req.query('before') ?? Date.now() + 1)
+  const limit = Math.min(Number(c.req.query('limit') ?? 50), 200)
+  const rows = await c.env.DB.prepare(
+    `SELECT t.transaction_id, t.product_id, t.type, t.price_milli, t.currency, t.country,
+            t.purchase_date, t.event_type, t.refunded,
+            a.name AS app_name, a.icon_url AS app_icon, a.bundle_id AS app_bundle_id
+     FROM transactions t LEFT JOIN apps a ON a.id = t.app_id
+     WHERE t.type != 'Auto-Renewable Subscription' AND t.purchase_date < ?
+     ORDER BY t.purchase_date DESC LIMIT ?`
+  )
+    .bind(before, limit)
+    .all<{ purchase_date: number }>()
+  const purchases = rows.results
+  return c.json({
+    purchases,
+    nextBefore: purchases.length === limit ? purchases[purchases.length - 1].purchase_date : null,
+  })
+})
+
 api.get('/subscriptions/:otid/timeline', async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT t.*, n.type AS notification_type, n.subtype, n.received_at

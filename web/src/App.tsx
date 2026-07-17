@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { getToken, setToken, api } from './lib/api'
 import { Icon, type IconName } from './components/Icon'
 import { OverviewPage } from './pages/Overview'
-import { SubsPage } from './pages/Subs'
+import { RevenuePage } from './pages/Revenue'
 import { ReviewsPage } from './pages/Reviews'
 import { AlertsPage } from './pages/Alerts'
 import { SettingsPage } from './pages/Settings'
 
 const TABS: Array<{ key: string; label: string; icon: IconName }> = [
   { key: 'overview', label: '总览', icon: 'chart' },
-  { key: 'subs', label: '订阅', icon: 'creditCard' },
+  { key: 'revenue', label: '收入', icon: 'creditCard' },
   { key: 'reviews', label: '评论', icon: 'message' },
   { key: 'alerts', label: '告警', icon: 'bell' },
   { key: 'settings', label: '设置', icon: 'settings' },
@@ -92,7 +92,7 @@ export function App() {
     <>
       <main>
         {tab === 'overview' && <OverviewPage />}
-        {tab === 'subs' && <SubsPage />}
+        {tab === 'revenue' && <RevenuePage />}
         {tab === 'reviews' && <ReviewsPage />}
         {tab === 'alerts' && <AlertsPage />}
         {tab === 'settings' && <SettingsPage />}

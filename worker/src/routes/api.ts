@@ -102,13 +102,17 @@ api.get('/metrics/daily', async (c) => {
   return c.json(rows.results)
 })
 
-// 订阅列表与单订阅事件时间线
+// 订阅列表与单订阅事件时间线（status 支持逗号分隔多值）
 api.get('/subscriptions', async (c) => {
   const status = c.req.query('status')
+  const statuses = status ? status.split(',').map((s) => s.trim()).filter(Boolean) : []
+  const filter = statuses.length ? `WHERE s.status IN (${statuses.map(() => '?').join(',')})` : ''
   const rows = await c.env.DB.prepare(
-    `SELECT * FROM subscriptions ${status ? 'WHERE status = ?' : ''} ORDER BY updated_at DESC LIMIT 200`
+    `SELECT s.*, a.name AS app_name, a.icon_url AS app_icon, a.bundle_id AS app_bundle_id
+     FROM subscriptions s LEFT JOIN apps a ON a.id = s.app_id
+     ${filter} ORDER BY s.updated_at DESC LIMIT 200`
   )
-    .bind(...(status ? [status] : []))
+    .bind(...statuses)
     .all()
   return c.json(rows.results)
 })
@@ -147,6 +151,22 @@ api.get('/reviews', async (c) => {
     .all<Record<string, unknown> & { created_at: number }>()
   const reviews = rows.results.map((r) => ({ ...r, tags: JSON.parse((r.tags as string) ?? '[]') }))
   return c.json({ reviews, nextBefore: reviews.length === limit ? reviews[reviews.length - 1].created_at : null })
+})
+
+// 评论标签统计（本周抱怨最多的是什么）
+api.get('/reviews/tags/stats', async (c) => {
+  const days = Math.min(Number(c.req.query('days') ?? 30), 365)
+  const appId = c.req.query('app_id')
+  const since = Date.now() - days * 86400_000
+  const rows = await c.env.DB.prepare(
+    `SELECT rt.tag, COUNT(*) AS count FROM review_tags rt
+     JOIN reviews r ON r.id = rt.review_id
+     WHERE r.created_at >= ? ${appId ? 'AND r.app_id = ?' : ''}
+     GROUP BY rt.tag ORDER BY count DESC`
+  )
+    .bind(...(appId ? [since, Number(appId)] : [since]))
+    .all<{ tag: string; count: number }>()
+  return c.json(rows.results)
 })
 
 api.get('/ratings', async (c) => {

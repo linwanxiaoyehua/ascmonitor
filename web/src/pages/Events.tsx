@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, timeAgo, type EventRow } from '../lib/api'
-import { countryDisplay, money, productDisplay, subtypeLabel } from '../lib/format'
+import { countryDisplay, money, productDisplay, subtypeLabel, REVENUE_TYPES } from '../lib/format'
 import { Icon, type IconName } from '../components/Icon'
 import { AppIcon } from '../components/AppIcon'
 
@@ -29,7 +29,7 @@ function ListSkeleton() {
   )
 }
 
-export function EventsPage() {
+export function EventsPage({ embedded = false }: { embedded?: boolean }) {
   const [events, setEvents] = useState<EventRow[] | null>(null)
   const [nextBefore, setNextBefore] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -53,7 +53,7 @@ export function EventsPage() {
 
   return (
     <div>
-      <h1 className="page-title">事件流</h1>
+      {!embedded && <h1 className="page-title">事件流</h1>}
       {events === null ? (
         <ListSkeleton />
       ) : events.length === 0 ? (
@@ -69,9 +69,15 @@ export function EventsPage() {
             // App 名可读（非 bundleId 占位）就用名字，否则退回 bundleId 末段
             const appLabel =
               e.appName && e.appName !== e.bundleId ? e.appName : e.bundleId?.split('.').pop() ?? e.bundleId
+            // 收入/退款事件：金额右侧大字突出（账单风格），不再挤在详情行里
+            const isRevenue = REVENUE_TYPES.has(e.type)
+            const isRefund = e.type === 'REFUND'
+            const amount = isRevenue || isRefund ? money(e.priceMilli, e.currency) : ''
             const detail = [
               appLabel,
-              [productDisplay(e.productId, e.bundleId), money(e.priceMilli, e.currency)].filter(Boolean).join(' '),
+              [productDisplay(e.productId, e.bundleId), amount ? '' : money(e.priceMilli, e.currency)]
+                .filter(Boolean)
+                .join(' '),
               countryDisplay(e.country),
             ]
               .filter(Boolean)
@@ -99,7 +105,14 @@ export function EventsPage() {
                   </div>
                   <div className="detail">{detail}</div>
                 </div>
-                <div className="time">{timeAgo(e.receivedAt)}</div>
+                {amount ? (
+                  <div className="side">
+                    <div className={`amount num ${isRefund ? 'neg' : 'pos'}`}>{isRefund ? '−' : '+'}{amount}</div>
+                    <div className="time">{timeAgo(e.receivedAt)}</div>
+                  </div>
+                ) : (
+                  <div className="time">{timeAgo(e.receivedAt)}</div>
+                )}
               </div>
             )
           })}

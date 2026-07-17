@@ -39,6 +39,9 @@ export interface Overview {
   todayRenewals: number
   todayRefunds: number
   autoRenewOffCount: number
+  riskSubs: number
+  todayReviews: number
+  todayReviewAvg: number | null
   /** ASC 订阅报告快照（补全 Webhook 前的存量） */
   snapshot: { date: string; active: number; trials: number } | null
 }
@@ -90,6 +93,50 @@ export interface Review {
   review_version: string | null
   created_at: number
   tags: string[]
+}
+
+export interface SubRow {
+  original_transaction_id: string
+  app_id: number | null
+  product_id: string
+  status: string
+  auto_renew: number
+  period: string | null
+  price_milli: number | null
+  currency: string | null
+  country: string | null
+  started_at: number | null
+  expires_at: number | null
+  updated_at: number
+  app_name: string | null
+  app_icon: string | null
+  app_bundle_id: string | null
+}
+
+export interface TimelineRow {
+  transaction_id: string
+  product_id: string
+  price_milli: number | null
+  currency: string | null
+  event_type: string
+  refunded: number
+  purchase_date: number | null
+  notification_type: string | null
+  subtype: string | null
+  received_at: number | null
+}
+
+export interface RatingSnapshot {
+  app_id: number
+  country: string
+  date: string
+  avg_rating: number | null
+  ratings_count: number | null
+}
+
+export interface TagStat {
+  tag: string
+  count: number
 }
 
 export interface AlertRule {

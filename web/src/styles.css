@@ -19,6 +19,7 @@
   --yellow: #ffd60a;
 
   --separator: rgba(84, 84, 88, 0.6);
+  --tabbar-bg: rgba(22, 22, 24, 0.9);
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px;
   --radius: 10px; /* iOS inset grouped list */
@@ -27,9 +28,32 @@
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
+/* iOS 浅色分组列表：跟随系统外观 */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f2f2f7;
+    --surface: #ffffff;
+    --surface-2: #e5e5ea;
+    --fill: #d1d1d6;
+
+    --text-hi: #000000;
+    --text-mid: rgba(60, 60, 67, 0.6);
+    --text-lo: rgba(60, 60, 67, 0.3);
+
+    --blue: #007aff;
+    --green: #34c759;
+    --red: #ff3b30;
+    --orange: #ff9500;
+    --yellow: #ffcc00;
+
+    --separator: rgba(60, 60, 67, 0.29);
+    --tabbar-bg: rgba(249, 249, 249, 0.92);
+  }
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { color-scheme: dark; }
+html { color-scheme: light dark; }
 
 body {
   background: var(--bg);
@@ -90,6 +114,7 @@ body {
   line-height: 1.2;
 }
 .card .value.pos { color: var(--green); }
+.card .value.warn { color: var(--orange); }
 .card .sub { font-size: 12px; color: var(--text-mid); font-variant-numeric: tabular-nums; margin-top: 2px; }
 
 /* ============ 分组列表（iOS Inset Grouped List） ============ */
@@ -107,8 +132,10 @@ body {
   position: relative;
   transition: background var(--dur) var(--ease);
 }
-/* 发丝分隔线：从图标右侧起（iOS 风格 inset separator） */
-.row + .row::before {
+/* 发丝分隔线：从图标右侧起（iOS 风格 inset separator）
+   作用于 .list 的直接子元素，兼容 .row 外再包一层（如可展开的订阅行） */
+.list > * + * { position: relative; }
+.list > * + *::before {
   content: '';
   position: absolute;
   top: 0; left: 60px; right: 0;
@@ -165,6 +192,45 @@ body {
 }
 .row .time { font-size: 14px; color: var(--text-mid); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+/* 行右侧：金额（账单风格突出）+ 时间 */
+.row .side { text-align: right; flex: none; }
+.row .amount { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.row .amount.pos { color: var(--green); }
+.row .amount.neg { color: var(--red); }
+.row .side .time { font-size: 12px; margin-top: 1px; }
+
+/* 分组标题计数 */
+.section-title .count {
+  margin-left: 6px;
+  color: var(--text-lo);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 订阅生命周期时间线（行展开态） */
+.timeline { padding: 2px var(--s4) var(--s3) 60px; }
+.timeline-item {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 5px 0;
+  font-size: 13px;
+  position: relative;
+}
+.timeline-item + .timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 2.5px; top: -8px;
+  width: 1px; height: 12px;
+  background: var(--separator);
+}
+.timeline-dot {
+  width: 6px; height: 6px; flex: none;
+  border-radius: 50%;
+  background: var(--green);
+}
+.timeline-dot.neg { background: var(--red); }
+.timeline-label { color: var(--text-hi); }
+.timeline-amount { color: var(--text-mid); margin-left: auto; }
+.timeline-time { color: var(--text-lo); font-variant-numeric: tabular-nums; }
+
 /* ============ 评论卡片（分组样式） ============ */
 .review-list { display: flex; flex-direction: column; gap: var(--s3); }
 .review-card {
@@ -197,7 +263,7 @@ body {
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0;
   display: flex; justify-content: space-around;
-  background: rgba(22, 22, 24, 0.9);
+  background: var(--tabbar-bg);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
   padding: 6px 0 calc(4px + env(safe-area-inset-bottom));
@@ -305,6 +371,39 @@ button.inline:active { opacity: 0.5; }
 .chart-bar { fill: var(--blue); }
 .chart-bar.last { fill: var(--green); }
 .chart-grid { stroke: var(--separator); stroke-width: 0.2; }
+.spark-line { fill: none; stroke: var(--blue); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
+
+/* 评分头部：变化指示与各国明细 */
+.delta-up { color: var(--green); }
+.delta-down { color: var(--red); }
+.country-ratings {
+  display: flex; gap: var(--s3); flex-wrap: wrap;
+  margin-top: var(--s3);
+  font-size: 13px;
+}
+.country-rating { white-space: nowrap; }
+
+/* 标签统计 chips（可点击筛选） */
+.tag-chips {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+.tag-chip {
+  background: var(--surface);
+  color: var(--text-mid);
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 30px;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.tag-chip .num { color: var(--text-lo); }
+.tag-chip.active { background: var(--blue); color: #fff; }
+.tag-chip.active .num { color: rgba(255, 255, 255, 0.75); }
 
 /* ============ States ============ */
 .empty {

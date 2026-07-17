@@ -49,7 +49,7 @@ function BarChart({ data, format }: { data: Array<{ date: string; value: number 
 
 function StatCard({
   icon, label, value, sub, tone,
-}: { icon: IconName; label: string; value: string; sub?: string; tone?: 'pos' }) {
+}: { icon: IconName; label: string; value: string; sub?: string; tone?: 'pos' | 'warn' }) {
   return (
     <div className="card">
       <div className="card-head">
@@ -142,6 +142,19 @@ export function OverviewPage() {
                 ? `截至 ${overview.snapshot.date.slice(5)}（ASC 报告）`
                 : undefined
             }
+          />
+          <StatCard
+            icon="message"
+            label="今日评论"
+            value={String(overview.todayReviews)}
+            sub={overview.todayReviewAvg != null ? `均分 ${overview.todayReviewAvg.toFixed(1)} ★` : undefined}
+          />
+          <StatCard
+            icon="alertTriangle"
+            label="流失风险"
+            value={String(overview.riskSubs)}
+            sub={`宽限期/扣款重试 · 已关续费 ${overview.autoRenewOffCount}`}
+            tone={overview.riskSubs > 0 ? 'warn' : undefined}
           />
         </div>
       )}

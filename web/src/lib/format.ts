@@ -63,6 +63,25 @@ export function productDisplay(productId?: string | null, bundleId?: string | nu
   return parts.length > 2 ? parts.slice(-2).join('.') : productId
 }
 
+const PERIOD_LABELS: Record<string, string> = { P1W: '周付', P1M: '月付', P3M: '季付', P6M: '半年付', P1Y: '年付' }
+
+/** ISO 8601 周期 → 中文，如 "P1M" → "月付" */
+export function periodLabel(period?: string | null): string {
+  return period ? PERIOD_LABELS[period] ?? '' : ''
+}
+
+/** 到期时间人性化："3 天后到期" / "今天到期" / "已到期 5 天" */
+export function expiresDisplay(ts?: number | null): string {
+  if (!ts) return ''
+  const days = Math.floor((ts - Date.now()) / 86400_000)
+  if (days > 0) return `${days} 天后到期`
+  if (days === 0) return '今天到期'
+  return `已到期 ${-days} 天`
+}
+
+/** 产生收入的事件类型（事件流金额高亮用） */
+export const REVENUE_TYPES = new Set(['SUBSCRIBED', 'DID_RENEW', 'ONE_TIME_CHARGE'])
+
 /** ASSN subtype → 中文 */
 export const SUBTYPE_LABELS: Record<string, string> = {
   INITIAL_BUY: '首次订阅',

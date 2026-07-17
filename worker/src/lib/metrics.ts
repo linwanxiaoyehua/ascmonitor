@@ -36,6 +36,11 @@ export interface Overview {
   todayRenewals: number
   todayRefunds: number
   autoRenewOffCount: number
+  /** 宽限期 + 扣款重试中的订阅数（即将被动流失） */
+  riskSubs: number
+  /** 今日新评论数与均分 */
+  todayReviews: number
+  todayReviewAvg: number | null
 }
 
 export async function getOverview(db: D1Database, appId?: number): Promise<Overview> {
@@ -81,14 +86,22 @@ export async function getOverview(db: D1Database, appId?: number): Promise<Overv
   let activeSubs = 0
   let trialSubs = 0
   let autoRenewOff = 0
+  let riskSubs = 0
   for (const s of activeRows.results) {
     if (s.status === 'trial') trialSubs++
     else activeSubs++
     if (!s.auto_renew) autoRenewOff++
+    if (s.status === 'grace_period' || s.status === 'billing_retry') riskSubs++
     if (s.status !== 'trial') {
       mrr += toUsd(s.price_milli, s.currency, fx) / (PERIOD_MONTHS[s.period ?? 'P1M'] ?? 1)
     }
   }
+
+  // 今日新评论（按抓取到的 created_at 计）
+  const todayReviews = await bindApp(
+    db.prepare(`SELECT COUNT(*) AS n, AVG(rating) AS avg FROM reviews WHERE created_at >= ? ${appFilter}`),
+    dayStart
+  ).first<{ n: number; avg: number | null }>()
 
   return {
     todayRevenueUsdMilli: Math.round(todayRevenue),
@@ -99,6 +112,9 @@ export async function getOverview(db: D1Database, appId?: number): Promise<Overv
     todayRenewals,
     todayRefunds: todayRefunds?.n ?? 0,
     autoRenewOffCount: autoRenewOff,
+    riskSubs,
+    todayReviews: todayReviews?.n ?? 0,
+    todayReviewAvg: todayReviews?.avg ?? null,
   }
 }
 

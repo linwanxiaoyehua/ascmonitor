@@ -48,6 +48,7 @@ export interface AppRow {
   bundle_id: string
   name: string
   asc_app_id: string | null
+  icon_url: string | null
 }
 
 export interface EventRow {
@@ -57,6 +58,12 @@ export interface EventRow {
   subtype: string | null
   environment?: string
   bundleId?: string
+  appName?: string | null
+  appIcon?: string | null
+  productId?: string | null
+  priceMilli?: number | null
+  currency?: string | null
+  country?: string | null
   receivedAt: number
 }
 
@@ -113,5 +120,14 @@ export function timeAgo(ts: number): string {
   if (diff < 60_000) return '刚刚'
   if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
   if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-  return new Date(ts).toLocaleDateString()
+
+  const d = new Date(ts)
+  const now = new Date()
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400_000)
+  const hm = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  if (dayDiff === 1) return `昨天 ${hm}`
+  if (dayDiff <= 7) return `${dayDiff} 天前`
+  const md = `${d.getMonth() + 1}月${d.getDate()}日`
+  return d.getFullYear() === now.getFullYear() ? md : `${d.getFullYear()}年${md}`
 }

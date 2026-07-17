@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, timeAgo, type EventRow } from '../lib/api'
+import { countryDisplay, money, productDisplay, subtypeLabel } from '../lib/format'
 import { Icon, type IconName } from '../components/Icon'
+import { AppIcon } from '../components/AppIcon'
 
 const TYPE_META: Record<string, { label: string; icon: IconName; tone: 'success' | 'primary' | 'danger' | 'accent' | 'neutral' }> = {
   SUBSCRIBED: { label: '新订阅', icon: 'zap', tone: 'success' },
@@ -64,18 +66,38 @@ export function EventsPage() {
         <div className="list">
           {events.map((e) => {
             const meta = TYPE_META[e.type] ?? { label: e.type, icon: 'activity' as IconName, tone: 'neutral' as const }
+            // App 名可读（非 bundleId 占位）就用名字，否则退回 bundleId 末段
+            const appLabel =
+              e.appName && e.appName !== e.bundleId ? e.appName : e.bundleId?.split('.').pop() ?? e.bundleId
+            const detail = [
+              appLabel,
+              [productDisplay(e.productId, e.bundleId), money(e.priceMilli, e.currency)].filter(Boolean).join(' '),
+              countryDisplay(e.country),
+            ]
+              .filter(Boolean)
+              .join(' · ')
             return (
               <div className="row" key={e.uuid}>
-                <div className={`row-icon${meta.tone !== 'neutral' ? ` tone-${meta.tone}` : ''}`}>
-                  <Icon name={meta.icon} size={18} />
-                </div>
+                {e.appIcon ? (
+                  // 有真实图标时：App 图标 + 事件类型角标（iOS 通知风格）
+                  <div className="icon-stack">
+                    <AppIcon url={e.appIcon} name={appLabel} size={30} />
+                    <span className={`icon-badge${meta.tone !== 'neutral' ? ` tone-${meta.tone}` : ''}`}>
+                      <Icon name={meta.icon} size={10} />
+                    </span>
+                  </div>
+                ) : (
+                  <div className={`row-icon${meta.tone !== 'neutral' ? ` tone-${meta.tone}` : ''}`}>
+                    <Icon name={meta.icon} size={18} />
+                  </div>
+                )}
                 <div className="main">
                   <div className="title">
                     {meta.label}
-                    {e.subtype && <span className="muted">{e.subtype}</span>}
+                    {e.subtype && <span className="muted">{subtypeLabel(e.subtype)}</span>}
                     {e.environment === 'Sandbox' && <span className="badge">沙盒</span>}
                   </div>
-                  <div className="detail">{e.bundleId}</div>
+                  <div className="detail">{detail}</div>
                 </div>
                 <div className="time">{timeAgo(e.receivedAt)}</div>
               </div>

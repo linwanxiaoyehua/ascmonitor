@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, timeAgo, type Review } from '../lib/api'
+import { countryFlag, countryName } from '../lib/format'
 import { Icon, Stars } from '../components/Icon'
 
 function ReviewsSkeleton() {
@@ -58,7 +59,11 @@ export function ReviewsPage() {
             <article className="review-card" key={r.id}>
               <div className="meta">
                 <Stars rating={r.rating} />
-                <span>{r.country?.toUpperCase()}</span>
+                {r.country && (
+                  <span title={countryName(r.country)}>
+                    {countryFlag(r.country) || r.country.toUpperCase()} {countryName(r.country)}
+                  </span>
+                )}
                 {r.review_version && <span>v{r.review_version}</span>}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.reviewer}</span>
                 <span style={{ marginLeft: 'auto', flex: 'none' }}>{timeAgo(r.created_at)}</span>

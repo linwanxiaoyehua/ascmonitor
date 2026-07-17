@@ -1,11 +1,15 @@
 // ASSN V2 事件处理：原始通知 → transactions / subscriptions 状态更新
 
 import type { NotificationPayload, TransactionInfo, RenewalInfo } from './assn'
+import { countryDisplay, money, periodLabel, productDisplay } from './humanize'
+import { enrichApp } from './app-enrich'
 
 export interface ProcessedEvent {
   /** 用于通知展示的摘要 */
   title: string
   body: string
+  /** App 图标（推送通知展示用） */
+  icon: string | null
   /** 是否值得实时推送 */
   notify: boolean
 }
@@ -56,9 +60,29 @@ function inferPeriod(tx: TransactionInfo): string | null {
   return 'P1Y'
 }
 
-function formatPrice(tx: TransactionInfo | null): string {
-  if (!tx || tx.price == null || !tx.currency) return ''
-  return ` ${(tx.price / 1000).toFixed(2)} ${tx.currency}`
+/** 推送正文：App 名 · 产品 周期 金额 · 🇨🇳 中国 */
+function buildBody(
+  appName: string | null,
+  bundleId: string | undefined,
+  tx: TransactionInfo | null
+): string {
+  const parts: string[] = []
+  // App 名可读（非 bundleId 占位）就用名字，否则退回 bundleId 末段
+  const app = appName && appName !== bundleId ? appName : bundleId?.split('.').pop() ?? ''
+  if (app) parts.push(app)
+
+  const product = [
+    productDisplay(tx?.productId, bundleId ?? tx?.bundleId),
+    periodLabel(tx ? inferPeriod(tx) : null),
+    money(tx?.price, tx?.currency),
+  ]
+    .filter(Boolean)
+    .join(' ')
+  if (product) parts.push(product)
+
+  const country = countryDisplay(tx?.storefront)
+  if (country) parts.push(country)
+  return parts.join(' · ')
 }
 
 export async function processNotification(
@@ -72,17 +96,40 @@ export async function processNotification(
 
   // App 归属（按 bundleId 自动注册，首次事件即建档）
   let appId: number | null = null
+  let appName: string | null = null
+  let appIcon: string | null = null
   const bundleId = payload.data?.bundleId ?? tx?.bundleId
   if (bundleId) {
-    const existing = await db.prepare('SELECT id FROM apps WHERE bundle_id = ?').bind(bundleId).first<{ id: number }>()
+    const existing = await db
+      .prepare('SELECT id, name, icon_url FROM apps WHERE bundle_id = ?')
+      .bind(bundleId)
+      .first<{ id: number; name: string; icon_url: string | null }>()
     if (existing) {
       appId = existing.id
+      appName = existing.name
+      appIcon = existing.icon_url
     } else {
       const inserted = await db
         .prepare('INSERT INTO apps (bundle_id, name, asc_app_id) VALUES (?, ?, ?) RETURNING id')
         .bind(bundleId, bundleId, payload.data?.appAppleId?.toString() ?? null)
         .first<{ id: number }>()
       appId = inserted?.id ?? null
+      // 首次建档时顺便补全图标与正式名称（一次性，失败静默）
+      if (inserted) {
+        await enrichApp(db, {
+          id: inserted.id,
+          bundle_id: bundleId,
+          name: bundleId,
+          asc_app_id: payload.data?.appAppleId?.toString() ?? null,
+          icon_url: null,
+        })
+        const fresh = await db
+          .prepare('SELECT name, icon_url FROM apps WHERE id = ?')
+          .bind(inserted.id)
+          .first<{ name: string; icon_url: string | null }>()
+        appName = fresh?.name ?? null
+        appIcon = fresh?.icon_url ?? null
+      }
     }
   }
   await db.prepare('UPDATE notifications_raw SET app_id = ? WHERE uuid = ?').bind(appId, rawUuid).run()
@@ -156,10 +203,11 @@ export async function processNotification(
 
   const titleFn = NOTIFY_TITLES[type]
   const title = titleFn?.(subtype) ?? null
-  const body = `${bundleId ?? ''} ${tx?.productId ?? ''}${formatPrice(tx)} ${tx?.storefront ?? ''}`.trim()
+  const body = buildBody(appName, bundleId, tx)
   return {
     title: title ?? `${type}${subtype ? `/${subtype}` : ''}`,
     body,
+    icon: appIcon,
     notify: title != null,
   }
 }

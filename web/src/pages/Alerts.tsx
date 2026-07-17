@@ -9,6 +9,27 @@ const KIND_META: Record<string, { label: string; icon: IconName; tone: 'danger' 
   webhook_silent: { label: 'Webhook 静默自检', icon: 'moon', tone: 'primary' },
 }
 
+/** 分钟 → "30 分钟" / "2 小时" */
+function minutesDisplay(min: number): string {
+  if (min < 60) return `${min} 分钟`
+  return min % 60 === 0 ? `${min / 60} 小时` : `${Math.floor(min / 60)} 小时 ${min % 60} 分钟`
+}
+
+/** 把规则参数翻译成一句人话 */
+function describeRule(rule: AlertRule): string {
+  let p: Record<string, number> = {}
+  try { p = JSON.parse(rule.params_json) } catch { /* 参数损坏时只显示静默期 */ }
+  const conds: Record<string, string> = {
+    new_bad_review: `${p.max_rating ?? 2} 星及以下立即提醒`,
+    bad_review_rate: `24 小时差评率 ≥ ${p.threshold_pct ?? 30}%（至少 ${p.min_count ?? 5} 条评论）`,
+    revenue_drop: `日收入比 7 日均值低 ${p.drop_pct ?? 30}% 以上`,
+    webhook_silent: `超过 ${p.hours ?? 24} 小时没有任何通知`,
+  }
+  const cond = conds[rule.kind]
+  const silence = `同类提醒间隔 ${minutesDisplay(rule.silence_min)}`
+  return cond ? `${cond} · ${silence}` : silence
+}
+
 export function AlertsPage() {
   const [rules, setRules] = useState<AlertRule[] | null>(null)
   const [events, setEvents] = useState<AlertEvent[]>([])
@@ -42,7 +63,7 @@ export function AlertsPage() {
                 </div>
                 <div className="main">
                   <div className="title">{meta.label}</div>
-                  <div className="detail">静默 {r.silence_min} 分钟</div>
+                  <div className="detail">{describeRule(r)}</div>
                 </div>
                 <button
                   className="switch"
@@ -64,10 +85,12 @@ export function AlertsPage() {
         </div>
       ) : (
         <div className="list">
-          {events.map((e) => (
+          {events.map((e) => {
+            const meta = KIND_META[e.kind]
+            return (
             <div className="row" key={e.id}>
-              <div className="row-icon tone-danger">
-                <Icon name="alertTriangle" size={17} />
+              <div className={`row-icon tone-${meta?.tone ?? 'danger'}`}>
+                <Icon name={meta?.icon ?? 'alertTriangle'} size={17} />
               </div>
               <div className="main">
                 <div className="title">{e.title}</div>
@@ -75,7 +98,8 @@ export function AlertsPage() {
               </div>
               <div className="time">{timeAgo(e.fired_at)}</div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

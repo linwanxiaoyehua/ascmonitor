@@ -3,6 +3,7 @@
 //         | revenue_drop（日收入低于 7 日均值）| webhook_silent（管道自检）
 
 import { notify } from './notify'
+import { countryDisplay, hoursDisplay } from './humanize'
 
 export interface AlertRule {
   id: number
@@ -19,7 +20,7 @@ async function fire(db: D1Database, rule: AlertRule, title: string, body: string
   const now = Date.now()
   if (rule.last_fired_at && now - rule.last_fired_at < rule.silence_min * 60_000) return // 静默期内
   await db.prepare('UPDATE alert_rules SET last_fired_at = ? WHERE id = ?').bind(now, rule.id).run()
-  await notify(db, rule.kind, title, body, rule.id)
+  await notify(db, rule.kind, title, body, { ruleId: rule.id })
 
   // Telegram 可选渠道
   const channels: string[] = JSON.parse(rule.channels_json)
@@ -51,7 +52,13 @@ export async function evaluateNewReview(
     const params = JSON.parse(rule.params_json) as { max_rating?: number }
     if (review.rating > (params.max_rating ?? 2)) continue
     const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)
-    await fire(db, rule, `😞 新差评 ${stars}`, `[${review.country ?? '?'}] ${review.title}\n${review.body.slice(0, 200)}`)
+    const where = countryDisplay(review.country)
+    await fire(
+      db,
+      rule,
+      `😞 新差评 ${stars}`,
+      `${where ? `${where} · ` : ''}${review.title}\n${review.body.slice(0, 200)}`
+    )
   }
 }
 
@@ -74,7 +81,12 @@ export async function evaluateFrequent(db: D1Database): Promise<void> {
     if (!row || row.total < (params.min_count ?? 5)) continue
     const pct = (row.bad / row.total) * 100
     if (pct >= (params.threshold_pct ?? 30)) {
-      await fire(db, rule, '📉 差评率告警', `24h 内 ${row.total} 条评论中 ${row.bad} 条差评（${pct.toFixed(0)}%）`)
+      await fire(
+        db,
+        rule,
+        '📉 差评率告警',
+        `过去 24 小时收到 ${row.total} 条评论，其中 ${row.bad} 条是差评，占 ${pct.toFixed(0)}%（阈值 ${params.threshold_pct ?? 30}%）`
+      )
     }
   }
 
@@ -86,7 +98,7 @@ export async function evaluateFrequent(db: D1Database): Promise<void> {
     if (!last?.t) continue // 从未收到过，不告警
     const silentHours = (now - last.t) / 3600_000
     if (silentHours >= (params.hours ?? 24)) {
-      await fire(db, rule, '🔇 Webhook 静默', `已 ${silentHours.toFixed(1)} 小时未收到 App Store 通知，请检查配置`)
+      await fire(db, rule, '🔇 Webhook 静默', `已经 ${hoursDisplay(silentHours)}没有收到 App Store 通知了，请检查 Server URL 配置`)
     }
   }
 }
@@ -109,11 +121,13 @@ export async function evaluateDaily(db: D1Database, yesterdayDate: string): Prom
     if (!row || row.avg7 == null || row.avg7 <= 0) continue
     const dropPct = (1 - (row.yesterday ?? 0) / row.avg7) * 100
     if (dropPct >= (params.drop_pct ?? 30)) {
+      const [, m, d] = yesterdayDate.split('-')
       await fire(
         db,
         rule,
         '🚨 收入下降',
-        `${yesterdayDate} 收入 $${(((row.yesterday ?? 0)) / 1000).toFixed(2)}，较 7 日均值下降 ${dropPct.toFixed(0)}%`
+        `昨天（${Number(m)}月${Number(d)}日）收入 $${((row.yesterday ?? 0) / 1000).toFixed(2)}，` +
+          `比前 7 天的日均 $${(row.avg7 / 1000).toFixed(2)} 下降了 ${dropPct.toFixed(0)}% ↓`
       )
     }
   }

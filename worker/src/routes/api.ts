@@ -4,6 +4,7 @@ import { getOverview, fxRates } from '../lib/metrics'
 import { fetchReviewsJob } from '../jobs/fetch-reviews'
 import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
 import { fetchSalesJob } from '../jobs/fetch-sales'
+import { enrichApp, type AppLite } from '../lib/app-enrich'
 
 export const api = new Hono<{ Bindings: Env }>()
 
@@ -51,12 +52,22 @@ api.get('/events', async (c) => {
   const limit = Math.min(Number(c.req.query('limit') ?? 50), 200)
   const appId = c.req.query('app_id')
   const rows = await c.env.DB.prepare(
-    `SELECT uuid, app_id, type, subtype, decoded_json, received_at FROM notifications_raw
-     WHERE received_at < ? ${appId ? 'AND app_id = ?' : ''}
-     ORDER BY received_at DESC LIMIT ?`
+    `SELECT n.uuid, n.app_id, n.type, n.subtype, n.decoded_json, n.received_at,
+            a.name AS app_name, a.bundle_id AS app_bundle_id, a.icon_url AS app_icon,
+            t.product_id, t.price_milli, t.currency, t.country
+     FROM notifications_raw n
+     LEFT JOIN apps a ON a.id = n.app_id
+     LEFT JOIN transactions t ON t.raw_uuid = n.uuid
+     WHERE n.received_at < ? ${appId ? 'AND n.app_id = ?' : ''}
+     GROUP BY n.uuid
+     ORDER BY n.received_at DESC LIMIT ?`
   )
     .bind(...(appId ? [before, Number(appId), limit] : [before, limit]))
-    .all<{ uuid: string; app_id: number; type: string; subtype: string | null; decoded_json: string; received_at: number }>()
+    .all<{
+      uuid: string; app_id: number; type: string; subtype: string | null; decoded_json: string; received_at: number
+      app_name: string | null; app_bundle_id: string | null; app_icon: string | null
+      product_id: string | null; price_milli: number | null; currency: string | null; country: string | null
+    }>()
 
   const events = rows.results.map((r) => {
     const decoded = JSON.parse(r.decoded_json)
@@ -66,7 +77,13 @@ api.get('/events', async (c) => {
       type: r.type,
       subtype: r.subtype,
       environment: decoded.data?.environment,
-      bundleId: decoded.data?.bundleId,
+      bundleId: decoded.data?.bundleId ?? r.app_bundle_id,
+      appName: r.app_name,
+      appIcon: r.app_icon,
+      productId: r.product_id,
+      priceMilli: r.price_milli,
+      currency: r.currency,
+      country: r.country,
       receivedAt: r.received_at,
     }
   })
@@ -260,7 +277,13 @@ api.post('/apps', async (c) => {
      RETURNING *`
   )
     .bind(body.bundle_id.trim(), body.name?.trim() || body.bundle_id.trim(), body.asc_app_id?.trim() || null)
-    .first()
+    .first<AppLite>()
+  // 自动补全图标 / 正式名称 / Apple ID（iTunes Lookup，免费公开接口）
+  if (row) {
+    await enrichApp(c.env.DB, row)
+    const fresh = await c.env.DB.prepare('SELECT * FROM apps WHERE id = ?').bind(row.id).first()
+    return c.json(fresh ?? row)
+  }
   return c.json(row)
 })
 

@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import { api, usd, type Overview, type MetricsDaily } from '../lib/api'
 import { Icon, type IconName } from '../components/Icon'
 
+/** "2026-07-16" → "7月16日 周四" */
+function dateDisplay(date: string): string {
+  const d = new Date(`${date}T00:00:00`)
+  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+  return `${d.getMonth() + 1}月${d.getDate()}日 周${week}`
+}
+
 /** 轻量 SVG 柱状趋势图：含横向网格线与首末日期轴标 */
 function BarChart({ data, format }: { data: Array<{ date: string; value: number }>; format: (v: number) => string }) {
   if (!data.length) return <div className="muted" style={{ textAlign: 'center', padding: '32px 0' }}>暂无数据，等待第一笔交易</div>
@@ -27,7 +34,7 @@ function BarChart({ data, format }: { data: Array<{ date: string; value: number 
               height={h}
               rx={Math.min(w * 0.32, 1)}
             >
-              <title>{`${d.date}: ${format(d.value)}`}</title>
+              <title>{`${dateDisplay(d.date)} · ${format(d.value)}`}</title>
             </rect>
           )
         })}
@@ -92,6 +99,15 @@ export function OverviewPage() {
   const revenueTrend = [...byDate.entries()].map(([date, value]) => ({ date, value }))
   const total30 = revenueTrend.reduce((s, d) => s + d.value, 0)
 
+  // 今日 vs 昨日（metrics_daily 最新一天即昨日 rollup）
+  const yesterdayRevenue = revenueTrend.length ? revenueTrend[revenueTrend.length - 1].value : null
+  let todaySub = ''
+  if (overview && yesterdayRevenue != null && yesterdayRevenue > 0) {
+    const pct = ((overview.todayRevenueUsdMilli - yesterdayRevenue) / yesterdayRevenue) * 100
+    const arrow = pct >= 0 ? '↑' : '↓'
+    todaySub = ` · 昨日 ${usd(yesterdayRevenue)} ${arrow}${Math.abs(pct).toFixed(0)}%`
+  }
+
   return (
     <div>
       <h1 className="page-title">总览</h1>
@@ -103,7 +119,7 @@ export function OverviewPage() {
             icon="dollar"
             label="今日收入"
             value={usd(overview.todayRevenueUsdMilli)}
-            sub={`新订 ${overview.todayNewSubs} · 续费 ${overview.todayRenewals} · 退款 ${overview.todayRefunds}`}
+            sub={`新订 ${overview.todayNewSubs} · 续费 ${overview.todayRenewals} · 退款 ${overview.todayRefunds}${todaySub}`}
             tone="pos"
           />
           <StatCard icon="trendingUp" label="MRR" value={usd(overview.mrrUsdMilli)} sub={`ARR ${usd(overview.mrrUsdMilli * 12)}`} />

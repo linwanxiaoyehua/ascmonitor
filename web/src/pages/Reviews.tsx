@@ -1,6 +1,7 @@
-// 评论：回答「用户怎么说」
-// Rating hero → 筛选（差评 / 标签，状态 URL 化：?bad=1&tag=x，可直链/跨页携带）→ 评论流
-// P4 将追加：评分分布条、版本对比卡、回复状态与回复 Sheet
+// 评分：回答「用户怎么评价」—— 评分与评论两条线都在这里
+// 评分 hero（均分 + 走势 + 分国家）→ 评分分布 → 版本对比
+//   → 筛选（差评 / 标签，状态 URL 化：?bad=1&tag=x，可直链/跨页携带）→ 评论流
+// 路由保持 /reviews：改路径会让已有书签与深链失效，收益不抵成本
 
 import { useSearchParams } from 'wouter'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
@@ -176,7 +177,7 @@ export function ReviewsPage() {
 
   return (
     <div className="narrow-lg">
-      <PageHeader title="评论" />
+      <PageHeader title="评分" />
       <RatingHero />
       <RatingDist />
       <VersionCompareCard />

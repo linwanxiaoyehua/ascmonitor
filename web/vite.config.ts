@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'ASCMonitor',
         short_name: 'ASCMonitor',
-        description: 'App Store 收入 · 订阅 · 评论监控',
+        description: 'App Store 收入 · 订阅 · 评分监控',
         theme_color: '#0a0a10',
         background_color: '#0a0a10',
         display: 'standalone',

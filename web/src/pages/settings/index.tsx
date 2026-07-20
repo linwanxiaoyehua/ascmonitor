@@ -66,7 +66,7 @@ function SettingsHome() {
           <ListRow
             leading={<span className="row-icon"><Icon name="info" size={16} /></span>}
             title="ASCMonitor"
-            detail="App Store 收入 · 订阅 · 评论监控 PWA"
+            detail="App Store 收入 · 订阅 · 评分监控 PWA"
           />
         </div>
       </Section>

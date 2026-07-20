@@ -44,7 +44,7 @@ export const SETTINGS_SUBS: NavChild[] = [
 export const TABS: NavTab[] = [
   { path: '/', label: '总览', icon: 'chart', owns: ['/', '/activity'], children: OVERVIEW_SUBS },
   { path: '/revenue', label: '收入', icon: 'creditCard', owns: ['/revenue'], children: REVENUE_SUBS },
-  { path: '/reviews', label: '评论', icon: 'message', owns: ['/reviews'] },
+  { path: '/reviews', label: '评分', icon: 'star', owns: ['/reviews'] },
   { path: '/settings', label: '设置', icon: 'settings', owns: ['/settings'], children: SETTINGS_SUBS },
 ]
 

@@ -1,10 +1,12 @@
 // 主题偏好：自动（跟随系统）/ 浅色 / 深色，存 localStorage
-// CSS 侧通过 :root[data-theme] 覆盖令牌，见 styles.css
+// token 全部用 light-dark() 声明（tokens.css），这里只负责：
+// 1. :root[data-theme] 切 color-scheme（驱动 light-dark() 解析）
+// 2. 同步状态栏 theme-color meta
 
 export type Theme = 'auto' | 'light' | 'dark'
 
 const KEY = 'ascmonitor_theme'
-const BG = { light: '#f2f2f7', dark: '#000000' }
+const BG = { light: '#f4f5f8', dark: '#0b0e14' }
 
 export function getTheme(): Theme {
   const v = localStorage.getItem(KEY)

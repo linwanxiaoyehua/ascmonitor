@@ -1,0 +1,110 @@
+/* ============ Base：reset、排版、表单 ============ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  background: var(--bg-app);
+  color: var(--text-1);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root { min-height: 100dvh; }
+
+/* 字阶：12 / 13 / 15 / 17 / 22 / 28 */
+.t-caption { font-size: 12px; }
+.t-detail { font-size: 13px; }
+.t-body { font-size: 15px; }
+.t-emph { font-size: 17px; }
+.t-title { font-size: 22px; font-weight: 700; }
+.t-display { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--text-2); font-size: 13px; }
+.pos { color: var(--success); }
+.neg { color: var(--danger); }
+
+a { color: var(--accent); text-decoration: none; }
+
+/* ---- 表单 ---- */
+input, textarea, select {
+  width: 100%;
+  background: var(--bg-surface);
+  color: var(--text-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: 10px var(--s3);
+  font-size: 15px;
+  font-family: inherit;
+  min-height: 42px;
+  transition: border-color var(--dur) var(--ease);
+}
+input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+::placeholder { color: var(--text-3); }
+
+.field { margin-bottom: var(--s4); }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* ---- 按钮 ---- */
+button { font-family: inherit; cursor: pointer; }
+button:disabled { cursor: default; }
+button.primary, button.ghost {
+  border-radius: var(--radius-control);
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 42px;
+  border: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+  transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+button.primary { background: var(--accent); color: var(--on-accent); }
+button.ghost { background: var(--bg-surface); color: var(--accent); border: 1px solid var(--border-subtle); }
+button.primary:active { opacity: 0.8; }
+button.ghost:active { background: var(--bg-raised); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.error { color: var(--danger); font-size: 13px; margin: var(--s2) 0; }
+
+/* ---- 布局 utility（页面禁用 inline style，动态值除外） ---- */
+.btn-block { width: 100%; }
+.center { text-align: center; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flex-1 { flex: 1; }
+.ml-auto { margin-left: auto; }
+.hstack { display: flex; gap: 10px; }
+.hstack-center { display: flex; align-items: center; gap: 8px; }
+.vstack { display: flex; flex-direction: column; gap: 10px; }
+.mt-2 { margin-top: var(--s2); }
+.mt-3 { margin-top: var(--s3); }
+.mt-4 { margin-top: var(--s4); }
+.mb-2 { margin-bottom: var(--s2); }
+.mb-3 { margin-bottom: var(--s3); }
+.mb-4 { margin-bottom: var(--s4); }
+.mb-5 { margin-bottom: var(--s5); }
+.accent-text { color: var(--accent); }
+/* 列表/表单下方的提示行（配 .muted） */
+.hint { margin: var(--s2) 2px 0; }
+/* 登录 / 初始化整屏 */
+.login-screen { padding-top: 96px; }
+.login-icon { display: flex; justify-content: center; margin-bottom: var(--s4); }
+.token-box { padding: var(--s4); margin-bottom: var(--s4); word-break: break-all; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

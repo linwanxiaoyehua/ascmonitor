@@ -1,0 +1,77 @@
+/* ============================================================
+   Design Tokens — 现代监控 dashboard（Linear/Vercel 式暗色语言）
+   每个 token 用 light-dark() 只声明一次；
+   手动主题由 :root[data-theme] 切 color-scheme（见 theme.ts）
+   ============================================================ */
+
+:root {
+  color-scheme: light dark;
+}
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
+
+:root {
+  /* ---- 语义层：背景与分层（深色 = 更深的底 + 更亮的面 + 1px 内高光，见 --shadow-card） ---- */
+  --bg-app: light-dark(#f4f5f8, #090c12);
+  --bg-surface: light-dark(#ffffff, #151c28);
+  --bg-raised: light-dark(#eef0f4, #1e2735);
+  --bg-inset: light-dark(#e8eaef, #0d1119);
+  --border-subtle: light-dark(rgba(23, 32, 50, 0.08), rgba(148, 166, 200, 0.13));
+  --border-strong: light-dark(rgba(23, 32, 50, 0.16), rgba(148, 166, 200, 0.24));
+  /* 卡片立体感：顶部 1px 内高光 + 微阴影（浅色只留极淡投影） */
+  --shadow-card: light-dark(
+    0 1px 2px rgba(23, 32, 50, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3)
+  );
+
+  /* ---- 文本三级 ---- */
+  --text-1: light-dark(#181d29, #e9edf5);
+  --text-2: light-dark(rgba(38, 48, 68, 0.64), rgba(183, 197, 220, 0.64));
+  --text-3: light-dark(rgba(38, 48, 68, 0.4), rgba(183, 197, 220, 0.38));
+
+  /* ---- 品牌 accent（靛紫，区别于 App Store 蓝） ---- */
+  --accent: light-dark(#4c59df, #7d8aff);
+  --accent-soft: light-dark(rgba(76, 89, 223, 0.1), rgba(125, 138, 255, 0.14));
+  --on-accent: light-dark(#ffffff, #10131f);
+
+  /* ---- 功能语义色（每色 默认 / -soft 底 两档） ---- */
+  --success: light-dark(#0e9f4f, #3ddc84);
+  --success-soft: light-dark(rgba(14, 159, 79, 0.1), rgba(61, 220, 132, 0.13));
+  --danger: light-dark(#d92d20, #ff6b62);
+  --danger-soft: light-dark(rgba(217, 45, 32, 0.1), rgba(255, 107, 98, 0.13));
+  --warning: light-dark(#c77414, #ffb454);
+  --warning-soft: light-dark(rgba(199, 116, 20, 0.12), rgba(255, 180, 84, 0.14));
+  --info: light-dark(#0272b6, #57b7ff);
+  --info-soft: light-dark(rgba(2, 114, 182, 0.1), rgba(87, 183, 255, 0.13));
+  --neutral: light-dark(rgba(38, 48, 68, 0.55), rgba(183, 197, 220, 0.55));
+  --neutral-soft: light-dark(rgba(38, 48, 68, 0.08), rgba(183, 197, 220, 0.12));
+
+  /* ---- 图表色板（独立于 UI 语义色；正/负走势固定绿/红但色阶不同于 success/danger） ---- */
+  --chart-1: light-dark(#5a68e8, #7d8aff);
+  --chart-2: light-dark(#0d9bbf, #4cc9e8);
+  --chart-3: light-dark(#9455d4, #b07ce8);
+  --chart-4: light-dark(#0f9e84, #3ecfae);
+  --chart-5: light-dark(#d98a12, #ffb454);
+  --chart-6: light-dark(#d4508f, #f47fb7);
+  --chart-pos: light-dark(#12a25a, #38d68b);
+  --chart-neg: light-dark(#dd3b30, #ff7a70);
+  --chart-grid: light-dark(rgba(23, 32, 50, 0.07), rgba(148, 166, 200, 0.09));
+
+  /* ---- 评分星 ---- */
+  --star: light-dark(#e8a213, #ffcf4d);
+
+  /* ---- 组件层 ---- */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s7: 28px; --s8: 32px;
+
+  /* ---- 数据排版：KPI / 金额 / 图表总计用系统 mono 栈（Dashboard-Data 风格，零外部字体） ---- */
+  --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Roboto Mono', 'Consolas', monospace;
+
+  /* ---- Tab bar / 顶栏毛玻璃 ---- */
+  --bar-bg: light-dark(rgba(244, 245, 248, 0.86), rgba(11, 14, 20, 0.82));
+
+  --dur: 180ms;
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+}

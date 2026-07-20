@@ -7,12 +7,15 @@ export async function notify(
   kind: string,
   title: string,
   body: string,
-  opts?: { ruleId?: number; icon?: string | null }
+  opts?: { ruleId?: number; icon?: string | null; push?: boolean }
 ): Promise<void> {
   const event = await db
     .prepare('INSERT INTO alert_events (rule_id, kind, title, body) VALUES (?, ?, ?, ?) RETURNING id')
     .bind(opts?.ruleId ?? null, kind, title, body)
     .first<{ id: number }>()
+
+  // 规则渠道未含 "push" 时只记录事件不推送（channels_json 真正生效）
+  if (opts?.push === false) return
 
   const subs = await db.prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions').all<{
     endpoint: string

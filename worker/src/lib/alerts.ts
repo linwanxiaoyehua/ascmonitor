@@ -20,10 +20,12 @@ async function fire(db: D1Database, rule: AlertRule, title: string, body: string
   const now = Date.now()
   if (rule.last_fired_at && now - rule.last_fired_at < rule.silence_min * 60_000) return // 静默期内
   await db.prepare('UPDATE alert_rules SET last_fired_at = ? WHERE id = ?').bind(now, rule.id).run()
-  await notify(db, rule.kind, title, body, { ruleId: rule.id })
+
+  // channels_json 生效：事件始终记录，Web Push 仅在 "push" 在列表时发送
+  const channels: string[] = JSON.parse(rule.channels_json)
+  await notify(db, rule.kind, title, body, { ruleId: rule.id, push: channels.includes('push') })
 
   // Telegram 可选渠道
-  const channels: string[] = JSON.parse(rule.channels_json)
   if (channels.includes('telegram')) {
     const tg = await db.prepare("SELECT value FROM config WHERE key = 'telegram'").first<{ value: string }>()
     if (tg) {
@@ -70,9 +72,10 @@ export async function evaluateFrequent(db: D1Database): Promise<void> {
     const params = JSON.parse(rule.params_json) as { threshold_pct?: number; min_count?: number; max_rating?: number }
     const since = now - 86400_000
     const appFilter = rule.app_id ? 'AND app_id = ?' : ''
+    // 按评论创建时间统计（fetched_at 会把历史回填灌进 24h 窗口造成误报）；排除双源重复
     const stmt = db.prepare(
       `SELECT COUNT(*) AS total, SUM(CASE WHEN rating <= ? THEN 1 ELSE 0 END) AS bad
-       FROM reviews WHERE fetched_at >= ? ${appFilter}`
+       FROM reviews WHERE created_at >= ? AND dup_of IS NULL ${appFilter}`
     )
     const row = await (rule.app_id
       ? stmt.bind(params.max_rating ?? 2, since, rule.app_id)
@@ -92,13 +95,20 @@ export async function evaluateFrequent(db: D1Database): Promise<void> {
 
   for (const rule of await rulesOf(db, 'webhook_silent')) {
     const params = JSON.parse(rule.params_json) as { hours?: number }
-    const last = await db
-      .prepare('SELECT MAX(received_at) AS t FROM notifications_raw')
-      .first<{ t: number | null }>()
+    // 规则绑定 App 时按该 App 的最近事件评估（多 App 时可定位哪个断流）
+    const last = await (rule.app_id
+      ? db.prepare('SELECT MAX(received_at) AS t FROM notifications_raw WHERE app_id = ?').bind(rule.app_id)
+      : db.prepare('SELECT MAX(received_at) AS t FROM notifications_raw')
+    ).first<{ t: number | null }>()
     if (!last?.t) continue // 从未收到过，不告警
     const silentHours = (now - last.t) / 3600_000
     if (silentHours >= (params.hours ?? 24)) {
-      await fire(db, rule, '🔇 Webhook 静默', `已经 ${hoursDisplay(silentHours)}没有收到 App Store 通知了，请检查 Server URL 配置`)
+      let scope = ''
+      if (rule.app_id) {
+        const app = await db.prepare('SELECT name FROM apps WHERE id = ?').bind(rule.app_id).first<{ name: string }>()
+        scope = app ? `「${app.name}」` : ''
+      }
+      await fire(db, rule, '🔇 Webhook 静默', `${scope}已经 ${hoursDisplay(silentHours)}没有收到 App Store 通知了，请检查 Server URL 配置`)
     }
   }
 }

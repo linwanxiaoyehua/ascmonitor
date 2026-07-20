@@ -2,6 +2,9 @@
    Design Tokens — 现代监控 dashboard（Linear/Vercel 式暗色语言）
    每个 token 用 light-dark() 只声明一次；
    手动主题由 :root[data-theme] 切 color-scheme（见 theme.ts）
+
+   规约：组件层不写裸 px（1px 描边、SVG 几何除外），
+        字号 / 间距 / 圆角一律引用下面的变量。
    ============================================================ */
 
 :root {
@@ -23,6 +26,8 @@
     0 1px 2px rgba(23, 32, 50, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3)
   );
+  --shadow-pop: 0 4px 16px light-dark(rgba(23, 32, 50, 0.12), rgba(0, 0, 0, 0.5));
+  --shadow-float: 0 6px 24px light-dark(rgba(23, 32, 50, 0.14), rgba(0, 0, 0, 0.5));
 
   /* ---- 文本三级 ---- */
   --text-1: light-dark(#181d29, #e9edf5);
@@ -32,6 +37,7 @@
   /* ---- 品牌 accent（靛紫，区别于 App Store 蓝） ---- */
   --accent: light-dark(#4c59df, #7d8aff);
   --accent-soft: light-dark(rgba(76, 89, 223, 0.1), rgba(125, 138, 255, 0.14));
+  --accent-line: light-dark(rgba(76, 89, 223, 0.28), rgba(125, 138, 255, 0.32));
   --on-accent: light-dark(#ffffff, #10131f);
 
   /* ---- 功能语义色（每色 默认 / -soft 底 两档） ---- */
@@ -39,6 +45,7 @@
   --success-soft: light-dark(rgba(14, 159, 79, 0.1), rgba(61, 220, 132, 0.13));
   --danger: light-dark(#d92d20, #ff6b62);
   --danger-soft: light-dark(rgba(217, 45, 32, 0.1), rgba(255, 107, 98, 0.13));
+  --danger-line: light-dark(rgba(217, 45, 32, 0.22), rgba(255, 107, 98, 0.26));
   --warning: light-dark(#c77414, #ffb454);
   --warning-soft: light-dark(rgba(199, 116, 20, 0.12), rgba(255, 180, 84, 0.14));
   --info: light-dark(#0272b6, #57b7ff);
@@ -60,17 +67,62 @@
   /* ---- 评分星 ---- */
   --star: light-dark(#e8a213, #ffcf4d);
 
-  /* ---- 组件层 ---- */
-  --radius-card: 12px;
+  /* ============ 排版尺度 ============
+     --fs-1 最小 → --fs-10 最大；正文 = --fs-5(15px)
+     1:11 徽标/tab 标签  2:12 说明  3:13 次要  4:14 紧凑正文
+     5:15 正文  6:17 强调  7:20 图表总计  8:22 页题  9:24 KPI  10:28 展示 */
+  --fs-1: 11px;
+  --fs-2: 12px;
+  --fs-3: 13px;
+  --fs-4: 14px;
+  --fs-5: 15px;
+  --fs-6: 17px;
+  --fs-7: 20px;
+  --fs-8: 22px;
+  --fs-9: 24px;
+  --fs-10: 28px;
+
+  /* ---- 字重 ---- */
+  --fw-medium: 500;
+  --fw-semi: 600;
+  --fw-bold: 700;
+
+  /* ============ 间距尺度（4px 网格 + 2px 半档） ============ */
+  --s0-5: 2px;
+  --s1: 4px;
+  --s1-5: 6px;
+  --s2: 8px;
+  --s2-5: 10px;
+  --s3: 12px;
+  --s3-5: 14px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 28px;
+  --s8: 32px;
+
+  /* ---- 圆角 ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
   --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s7: 28px; --s8: 32px;
+
+  /* ---- 命中区域下限（触屏 44px） ---- */
+  --tap: 44px;
 
   /* ---- 数据排版：KPI / 金额 / 图表总计用系统 mono 栈（Dashboard-Data 风格，零外部字体） ---- */
   --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Roboto Mono', 'Consolas', monospace;
 
   /* ---- Tab bar / 顶栏毛玻璃 ---- */
   --bar-bg: light-dark(rgba(244, 245, 248, 0.86), rgba(11, 14, 20, 0.82));
+
+  /* ---- 内容限宽 ---- */
+  --w-main: 720px;
+  --w-main-lg: 1088px;
+  --w-narrow: 640px;
+  --w-narrow-lg: 880px;
 
   --dur: 180ms;
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);

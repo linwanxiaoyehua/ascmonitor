@@ -62,22 +62,22 @@ function ReconciliationCard() {
   return (
     <Section title="对账（30 天）">
       <div className="panel pad">
-        <div className="vstack" style={{ gap: 8 }}>
-          <div className="hstack-center">
-            <span className="t-detail muted flex-1">事件收入（客户价）<CaliberTag>实时</CaliberTag></span>
+        <div className="vstack tight">
+          <div className="recon-row">
+            <span className="k">事件收入（客户价）<CaliberTag>实时</CaliberTag></span>
             <span className="num">{fmtUsd(s.eventsUsdMilli)}</span>
           </div>
-          <div className="hstack-center">
-            <span className="t-detail muted flex-1">估算净得（× {Math.round(s.proceedsRate * 100)}%）<CaliberTag>估算</CaliberTag></span>
+          <div className="recon-row">
+            <span className="k">估算净得（× {Math.round(s.proceedsRate * 100)}%）<CaliberTag>估算</CaliberTag></span>
             <span className="num">{fmtUsd(s.estimatedUsdMilli)}</span>
           </div>
-          <div className="hstack-center">
-            <span className="t-detail muted flex-1">账单实际净得 <CaliberTag>账单 · T+1</CaliberTag></span>
+          <div className="recon-row">
+            <span className="k">账单实际净得 <CaliberTag>账单 · T+1</CaliberTag></span>
             <span className="num">{fmtUsd(s.actualUsdMilli)}</span>
           </div>
           {s.diffPct != null && (
-            <div className="hstack-center" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
-              <span className="t-detail muted flex-1">估算偏差（费率 / 汇率 / 到账时差）</span>
+            <div className="recon-row total">
+              <span className="k">估算偏差（费率 / 汇率 / 到账时差）</span>
               <span className={`num ${Math.abs(s.diffPct) > 15 ? 'neg' : 'muted'}`}>
                 {s.diffPct > 0 ? '+' : ''}{s.diffPct.toFixed(1)}%
               </span>
@@ -246,6 +246,7 @@ export function RevenueDetail() {
       <Section title="交易明细">
         <div className="mb-3">
           <SegmentedControl
+            label="明细类型"
             options={[
               { value: 'subs', label: '订阅' },
               { value: 'purchases', label: '一次性购买' },

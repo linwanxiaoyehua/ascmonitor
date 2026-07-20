@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { Route, Switch } from 'wouter'
-import { api, getToken, setToken } from './lib/api'
+import { api, clearToken, getToken, setToken } from './lib/api'
 import { UNAUTHORIZED_EVENT } from './lib/query'
 import { AppShell } from './components/AppShell'
 import { Icon } from './components/Icon'
@@ -17,17 +17,30 @@ const SettingsPage = lazy(() => import('./pages/settings').then((m) => ({ defaul
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const [initializing, setInitializing] = useState(false)
   const [newToken, setNewToken] = useState('')
   const [copied, setCopied] = useState(false)
 
-  const tryLogin = async () => {
-    setToken(input.trim())
+  // form 提交而非 onClick：移动端键盘「前往」与回车都能登录
+  const tryLogin = async (e: FormEvent) => {
+    e.preventDefault()
+    const candidate = input.trim()
+    if (!candidate || busy) return
+    setBusy(true)
+    setError('')
+    const previous = getToken()
+    setToken(candidate)
     try {
       await api('/api/apps')
       onLogin()
     } catch {
+      // 校验失败不能把无效 token 留在 localStorage
+      if (previous) setToken(previous)
+      else clearToken()
       setError('Token 无效')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -78,7 +91,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   }
 
   return (
-    <div className="shell-main login-screen">
+    <form className="shell-main login-screen" onSubmit={tryLogin}>
       <div className="login-icon accent-text">
         <Icon name="chart" size={44} />
       </div>
@@ -91,14 +104,20 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           onChange={(e) => setInput(e.target.value)}
           placeholder="粘贴 Token"
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
         />
       </div>
       {error && <div className="error" role="alert">{error}</div>}
       <div className="hstack">
-        <button className="primary flex-1" onClick={tryLogin}>登录</button>
-        <button className="ghost" onClick={trySetup} disabled={initializing}>首次初始化</button>
+        <button type="submit" className="primary flex-1" disabled={busy || !input.trim()}>
+          {busy ? '验证中…' : '登录'}
+        </button>
+        <button type="button" className="ghost" onClick={trySetup} disabled={initializing}>首次初始化</button>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -106,6 +125,18 @@ function PageFallback() {
   return (
     <div className="mt-4">
       <Skeleton variant="rows" count={5} />
+    </div>
+  )
+}
+
+/** 冷启动校验 token 期间的占位（原来 return null 会白屏闪一下） */
+function BootScreen() {
+  return (
+    <div className="shell-main login-screen center" aria-busy="true">
+      <div className="login-icon accent-text">
+        <Icon name="chart" size={44} />
+      </div>
+      <p className="muted">正在载入…</p>
     </div>
   )
 }
@@ -132,7 +163,7 @@ export function App() {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
   }, [])
 
-  if (checking) return null
+  if (checking) return <BootScreen />
   if (!authed) {
     return (
       <>

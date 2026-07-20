@@ -50,9 +50,7 @@ function ChartTooltip({
 
 export default function TrendChartInner({ type, data, series, format, axisFormat, height = 200 }: TrendChartProps) {
   if (!data.length) {
-    return (
-      <div className="muted" style={{ textAlign: 'center', padding: '48px 0' }}>暂无数据</div>
-    )
+    return <div className="chart-empty">暂无数据</div>
   }
   // 移动端密度：X 轴只标首末日期
   const ticks = data.length > 1 ? [data[0].date as string, data[data.length - 1].date as string] : undefined

@@ -7,7 +7,8 @@ import { api, type ActivityItem } from '../lib/api'
 import { useAppFilter, withAppParam } from '../lib/app-filter'
 import { dayLabel } from '../lib/format'
 import { ActivityRow } from '../components/ActivityRow'
-import { EmptyState, FilterChips, LoadMore, PageHeader, Skeleton } from '../components/ui'
+import { SubPage } from '../components/SubPage'
+import { EmptyState, FilterChips, LoadMore, Skeleton } from '../components/ui'
 
 const KIND_FILTERS = [
   { key: 'revenue', label: '收入' },
@@ -48,11 +49,9 @@ export function ActivityPage() {
   }
 
   return (
-    <div className="narrow-lg">
-      <PageHeader title="动态" />
-
+    <SubPage title="实时动态" backTo="/" backLabel="返回总览" width="narrow-lg">
       <div className="hstack-center">
-        <FilterChips scroll items={KIND_FILTERS} active={kind} onToggle={setKind} />
+        <FilterChips scroll label="事件类型" items={KIND_FILTERS} active={kind} onToggle={setKind} />
         <button
           className={`chip${hideSandbox ? ' active' : ''}`}
           aria-pressed={hideSandbox}
@@ -85,6 +84,6 @@ export function ActivityPage() {
         ))
       )}
       <LoadMore hasNextPage={!!q.hasNextPage} isFetchingNextPage={q.isFetchingNextPage} fetchNextPage={() => q.fetchNextPage()} />
-    </div>
+    </SubPage>
   )
 }

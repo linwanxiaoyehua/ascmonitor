@@ -7,7 +7,7 @@ import { toast } from '../../lib/toast'
 import { Icon, type IconName } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
 import { ListRow, Section, Skeleton, Switch } from '../../components/ui'
-import { SubPage } from './SubPage'
+import { SubPage } from '../../components/SubPage'
 
 function b64urlToUint8(input: string): Uint8Array {
   const b64 = input.replace(/-/g, '+').replace(/_/g, '/')
@@ -263,7 +263,7 @@ function DigestRow() {
 
 export function AlertsSection() {
   return (
-    <SubPage title="通知与告警">
+    <SubPage title="通知与告警" backTo="/settings" backLabel="返回设置">
       <Section title="推送通知">
         <PushRows />
       </Section>

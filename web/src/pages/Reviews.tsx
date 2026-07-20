@@ -26,6 +26,7 @@ function RatingDist() {
     <Section title="评分分布">
       <div className="panel pad">
         <DistributionBars
+          variant="rating"
           data={data.distribution.map((d) => ({
             key: String(d.rating),
             label: `${d.rating} ★`,
@@ -50,7 +51,7 @@ function VersionCompareCard() {
   if (!data || data.versions.length === 0) return null
   return (
     <Section title="版本对比">
-      <div className="stat-grid cols-2">
+      <div className="stat-grid pair">
         {data.versions.map((v, i) => (
           <StatCard
             key={v.version}
@@ -106,7 +107,7 @@ function RatingHero() {
     <div className="chart-frame mb-3">
       <div className="head">
         <span className="total num">
-          {latest.avg.toFixed(2)} <span style={{ color: 'var(--star)' }}>★</span>
+          {latest.avg.toFixed(2)} <span className="star-text">★</span>
         </span>
         <span className="label num">
           {latest.count.toLocaleString()} 个评分
@@ -182,6 +183,7 @@ export function ReviewsPage() {
 
       <div className="vstack mb-3">
         <SegmentedControl
+          label="评分筛选"
           options={[
             { value: 'all', label: '全部' },
             { value: 'bad', label: '仅差评' },
@@ -192,6 +194,7 @@ export function ReviewsPage() {
         {(tagStats?.length ?? 0) > 0 && (
           <FilterChips
             scroll
+            label="评论标签"
             items={(tagStats ?? []).map((t) => ({ key: t.tag, label: t.tag, count: t.count }))}
             active={tag}
             onToggle={setTag}

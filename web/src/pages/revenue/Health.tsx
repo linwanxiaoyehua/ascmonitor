@@ -14,6 +14,7 @@ function TrialFunnel({ data }: { data: TrialCohort[] }) {
     <Section title="Trial 转化漏斗（按开始试用的周）">
       <div className="panel pad">
         <DistributionBars
+          variant="seq"
           data={data.map((c) => ({
             key: c.weekStart,
             label: c.weekStart.slice(5),
@@ -71,7 +72,7 @@ export function RevenueHealth() {
 
   return (
     <>
-      <div className="stat-grid cols-2">
+      <div className="stat-grid kpi">
         <StatCard
           loading={overviewQ.isPending}
           icon="users"

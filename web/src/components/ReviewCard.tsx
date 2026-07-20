@@ -44,7 +44,7 @@ export function ReviewCard({ review: r }: { review: Review }) {
         {r.review_version && <span>v{r.review_version}</span>}
         <span className="ellipsis">{r.reviewer}</span>
         {canReply && !responded && <Badge tone="info">未回复</Badge>}
-        <span className="ml-auto" style={{ flex: 'none' }}>{timeAgo(r.created_at)}</span>
+        <span className="review-time">{timeAgo(r.created_at)}</span>
       </div>
       {r.title && <div className="rtitle">{r.title}</div>}
       <div className="rbody">{r.body}</div>

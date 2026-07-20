@@ -6,7 +6,7 @@ import { api } from '../../lib/api'
 import { toast } from '../../lib/toast'
 import { Icon } from '../../components/Icon'
 import { ListRow, Section } from '../../components/ui'
-import { SubPage } from './SubPage'
+import { SubPage } from '../../components/SubPage'
 
 export function ConnectSection() {
   const [copied, setCopied] = useState(false)
@@ -47,7 +47,7 @@ export function ConnectSection() {
   const ascConfigured = (configKeys ?? []).filter((k) => k.startsWith('asc_')).length >= 3
 
   return (
-    <SubPage title="接入与凭证">
+    <SubPage title="接入与凭证" backTo="/settings" backLabel="返回设置">
       <Section title="App Store 服务器通知">
         <div className="list">
           <ListRow

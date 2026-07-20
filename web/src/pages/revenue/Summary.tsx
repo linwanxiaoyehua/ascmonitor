@@ -53,6 +53,7 @@ function RevenueTrend({ rate }: { rate: number }) {
       <div className="hstack-center mb-2">
         <span className="ml-auto">
           <SegmentedControl<`${Range}`>
+            label="时间范围"
             options={[
               { value: '7', label: '7 天' },
               { value: '30', label: '30 天' },
@@ -69,7 +70,7 @@ function RevenueTrend({ rate }: { rate: number }) {
           <span className="label">{range} 天合计</span>
         </div>
         {loading ? (
-          <Skeleton variant="chart" />
+          <Skeleton variant="chart" height={200} />
         ) : (
           <TrendChart
             type={range > 7 ? 'area' : 'bar'}
@@ -101,6 +102,7 @@ function BreakdownSection({ rate }: { rate: number }) {
       <div className="panel pad">
         <div className="mb-3">
           <SegmentedControl
+            label="收入构成维度"
             options={[
               { value: 'country', label: '按国家' },
               { value: 'product', label: '按产品' },
@@ -110,6 +112,7 @@ function BreakdownSection({ rate }: { rate: number }) {
           />
         </div>
         <DistributionBars
+          variant="seq"
           data={data.map((r) => ({
             key: r.key,
             label: by === 'country' ? countryDisplay(r.key) || r.key : r.label ?? r.key.split('.').slice(-2).join('.'),
@@ -173,7 +176,7 @@ export function RevenueSummary() {
   return (
     <>
       {/* 收入向 KPI（订阅健康类指标在「订阅健康」子页） */}
-      <div className="stat-grid cols-2">
+      <div className="stat-grid kpi">
         <StatCard
           loading={overviewQ.isPending}
           icon="dollar"
@@ -215,7 +218,7 @@ export function RevenueSummary() {
                 <span className="label">新订 + 续费笔数</span>
               </div>
               {metricsQ.isPending ? (
-                <Skeleton variant="chart" />
+                <Skeleton variant="chart" height={200} />
               ) : (
                 <TrendChart
                   type="bar"

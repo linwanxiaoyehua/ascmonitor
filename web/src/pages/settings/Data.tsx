@@ -7,7 +7,7 @@ import { timeAgo } from '../../lib/format'
 import { toast } from '../../lib/toast'
 import { Icon } from '../../components/Icon'
 import { ListRow, Section, Skeleton } from '../../components/ui'
-import { SubPage } from './SubPage'
+import { SubPage } from '../../components/SubPage'
 
 function HealthSection() {
   const queryClient = useQueryClient()
@@ -118,7 +118,7 @@ export function DataSection() {
   }
 
   return (
-    <SubPage title="数据运维">
+    <SubPage title="数据运维" backTo="/settings" backLabel="返回设置">
       <Section title="数据健康">
         <HealthSection />
       </Section>

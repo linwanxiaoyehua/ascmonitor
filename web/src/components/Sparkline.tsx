@@ -11,7 +11,7 @@ export function Sparkline({ data, height = 56 }: { data: number[]; height?: numb
     .map((v, i) => `${(i / (data.length - 1)) * W},${H - 2 - ((v - min) / span) * (H - 4)}`)
     .join(' ')
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height, display: 'block' }} preserveAspectRatio="none" role="img"
+    <svg className="sparkline" viewBox={`0 0 ${W} ${H}`} style={{ height }} preserveAspectRatio="none" role="img"
       aria-label={`走势 ${data[0].toFixed(2)} 到 ${data[data.length - 1].toFixed(2)}`}>
       <polyline className="spark-line" points={points} vectorEffect="non-scaling-stroke" />
     </svg>

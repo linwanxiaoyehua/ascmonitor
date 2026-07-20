@@ -8,7 +8,7 @@ import { AppIcon } from '../../components/AppIcon'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
 import { ListRow, Section, Skeleton } from '../../components/ui'
-import { SubPage } from './SubPage'
+import { SubPage } from '../../components/SubPage'
 
 export function AppsSection() {
   const queryClient = useQueryClient()
@@ -58,7 +58,7 @@ export function AppsSection() {
   })
 
   return (
-    <SubPage title="App 管理">
+    <SubPage title="App 管理" backTo="/settings" backLabel="返回设置">
       <Section title="App 列表">
         {isPending ? (
           <Skeleton variant="rows" count={2} />

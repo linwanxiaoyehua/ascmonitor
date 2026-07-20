@@ -6,7 +6,8 @@
 export type Theme = 'auto' | 'light' | 'dark'
 
 const KEY = 'ascmonitor_theme'
-const BG = { light: '#f4f5f8', dark: '#0b0e14' }
+// 必须与 tokens.css 的 --bg-app 一致，否则状态栏与页面底色差一档
+const BG = { light: '#f4f5f8', dark: '#090c12' }
 
 export function getTheme(): Theme {
   const v = localStorage.getItem(KEY)

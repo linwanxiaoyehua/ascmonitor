@@ -11,7 +11,7 @@ export type { TrendChartProps, TrendSeries } from './TrendChartInner'
 
 export function TrendChart(props: TrendChartProps) {
   return (
-    <Suspense fallback={<Skeleton variant="chart" />}>
+    <Suspense fallback={<Skeleton variant="chart" height={props.height} />}>
       <Inner {...props} />
     </Suspense>
   )

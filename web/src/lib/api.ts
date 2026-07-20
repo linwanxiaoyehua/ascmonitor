@@ -10,6 +10,10 @@ export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token)
 }
 
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)

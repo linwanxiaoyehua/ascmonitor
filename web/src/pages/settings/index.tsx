@@ -2,24 +2,19 @@
 //   /settings          主页面：偏好 + 分组导航 + 关于
 //   /settings/connect  接入与凭证    /settings/apps  App 管理
 //   /settings/alerts   通知与告警    /settings/data  数据运维
+// 二级页清单来自 lib/nav 的 SETTINGS_SUBS —— 与桌面侧边栏共用同一份定义
 // 告警 tab 已解散：规则配置归此处，历史归动态页
 
 import { useState } from 'react'
 import { useLocation, useParams } from 'wouter'
+import { SETTINGS_SUBS } from '../../lib/nav'
 import { getTheme, setTheme, type Theme } from '../../lib/theme'
-import { Icon, type IconName } from '../../components/Icon'
+import { Icon } from '../../components/Icon'
 import { ListRow, PageHeader, Section, SegmentedControl } from '../../components/ui'
 import { ConnectSection } from './Connect'
 import { AppsSection } from './Apps'
 import { AlertsSection } from './Alerts'
 import { DataSection } from './Data'
-
-const SECTIONS: Array<{ key: string; title: string; detail: string; icon: IconName; tone: string }> = [
-  { key: 'connect', title: '接入与凭证', detail: 'Webhook URL · ASC API 凭证', icon: 'key', tone: 'accent' },
-  { key: 'apps', title: 'App 管理', detail: 'App 列表 · Apple ID', icon: 'layers', tone: 'info' },
-  { key: 'alerts', title: '通知与告警', detail: '推送 · Telegram · 告警规则 · 日报', icon: 'bell', tone: 'danger' },
-  { key: 'data', title: '数据运维', detail: '手动抓取评论 / 账单', icon: 'wrench', tone: 'success' },
-]
 
 const THEME_OPTIONS: Array<{ value: Theme; label: string }> = [
   { value: 'auto', label: '跟随系统' },
@@ -36,10 +31,11 @@ function SettingsHome() {
       <PageHeader title="设置" />
 
       <Section title="偏好">
-        <div className="hstack-center">
-          <span className="t-detail muted" style={{ flex: 'none' }}>外观</span>
-          <div className="flex-1">
+        <div className="pref-row">
+          <span className="pref-label">外观</span>
+          <div className="pref-control">
             <SegmentedControl
+              label="外观"
               options={THEME_OPTIONS}
               value={theme}
               onChange={(t) => { setTheme(t); setThemeState(t) }}
@@ -50,14 +46,14 @@ function SettingsHome() {
 
       <Section title="配置">
         <div className="list">
-          {SECTIONS.map((s) => (
+          {SETTINGS_SUBS.map((s) => (
             <ListRow
-              key={s.key}
-              leading={<span className={`row-icon tone-${s.tone}`}><Icon name={s.icon} size={16} /></span>}
-              title={s.title}
+              key={s.path}
+              leading={<span className={`row-icon tone-${s.tone}`}>{s.icon && <Icon name={s.icon} size={16} />}</span>}
+              title={s.label}
               detail={s.detail}
               trailing="chevron"
-              onPress={() => navigate(`/settings/${s.key}`)}
+              onPress={() => navigate(s.path)}
             />
           ))}
         </div>

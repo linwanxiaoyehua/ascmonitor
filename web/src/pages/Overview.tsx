@@ -124,8 +124,8 @@ export function OverviewPage() {
     <div className="overview-grid">
       <PageHeader title="总览" />
 
-      {/* KPI：今日收入 / MRR / 活跃订阅 / 试用中 —— 卡片是路由器 */}
-      <div className="stat-grid cols-2 span-full">
+      {/* KPI：今日收入 / MRR / 活跃订阅 / 试用中 —— 每张卡通向它自己的下钻页，不重复指向同一处 */}
+      <div className="stat-grid kpi span-full">
         <StatCard
           loading={overviewQ.isPending}
           icon="dollar"
@@ -141,7 +141,7 @@ export function OverviewPage() {
           label="MRR"
           value={o ? fmtUsd(o.mrrUsdMilli) : ''}
           foot={o ? `ARR ${fmtUsd(o.mrrUsdMilli * 12)}` : undefined}
-          onPress={() => navigate('/revenue')}
+          onPress={() => navigate('/revenue/health')}
         />
         <StatCard
           loading={overviewQ.isPending}
@@ -199,7 +199,7 @@ export function OverviewPage() {
               <span className="label">30 天合计</span>
             </div>
             {metricsQ.isPending ? (
-              <Skeleton variant="chart" />
+              <Skeleton variant="chart" height={170} />
             ) : (
               <TrendChart
                 type="area"

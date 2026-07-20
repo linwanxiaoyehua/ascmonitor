@@ -4,3 +4,4 @@ dist/
 .dev.vars
 *.p8
 .DS_Store
+*.tsbuildinfo

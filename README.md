@@ -21,10 +21,21 @@ npm test                        # worker 单元测试（JWS 验签等）
 ## 部署（Cloudflare 免费层）
 
 ```bash
+cp wrangler.example.jsonc wrangler.jsonc   # 部署配置（已 gitignore，含私有信息）
 npx wrangler d1 create ascmonitor          # 把返回的 database_id 填入 wrangler.jsonc
 npm run db:migrate:remote
 npm run deploy
 ```
+
+`wrangler.jsonc` 不入库：它承载 D1 `database_id`、自定义域名等部署方私有信息。
+以 `wrangler.example.jsonc` 为模板复制一份，填上自己的值即可。
+
+可选配置（写入 D1 的 `config` 表）：
+
+| key | 用途 |
+|-----|------|
+| `vapid_subject` | Web Push 的 VAPID subject（`https://` 或 `mailto:` URL），缺省 `https://example.com` |
+| `telegram` | Telegram 告警渠道 `{"botToken":"…","chatId":"…"}`（也可在设置页填） |
 
 ## 初始化流程
 

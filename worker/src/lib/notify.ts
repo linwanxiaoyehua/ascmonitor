@@ -28,11 +28,19 @@ export async function notify(
 
   const vapid = await db.prepare("SELECT value FROM config WHERE key = 'vapid_keys'").first<{ value: string }>()
   if (!vapid) return
+  // 可选：部署方在 config 写 vapid_subject 覆盖缺省值
+  const subj = await db.prepare("SELECT value FROM config WHERE key = 'vapid_subject'").first<{ value: string }>()
 
   let delivered = false
   for (const sub of subs.results) {
     try {
-      await sendWebPush(JSON.parse(vapid.value), sub, JSON.stringify({ title, body, kind, icon: opts?.icon ?? undefined }))
+      await sendWebPush(
+        JSON.parse(vapid.value),
+        sub,
+        JSON.stringify({ title, body, kind, icon: opts?.icon ?? undefined }),
+        undefined,
+        subj?.value
+      )
       delivered = true
     } catch (err) {
       // 410/404 = 订阅失效，清理

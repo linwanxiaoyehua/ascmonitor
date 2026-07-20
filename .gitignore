@@ -5,3 +5,5 @@ dist/
 *.p8
 .DS_Store
 *.tsbuildinfo
+wrangler.jsonc
+.claude/settings.local.json

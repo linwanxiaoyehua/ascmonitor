@@ -1,0 +1,40 @@
+{
+  // 复制为 wrangler.jsonc 后填入自己的值（wrangler.jsonc 已在 .gitignore 中，
+  // 因为它装着 D1 database_id 与自定义域名这类部署方私有的信息）
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ascmonitor",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    // 前端构建产物由同一个 Worker 托管；API/webhook 路由优先于静态资源
+    "directory": "web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/webhook/*", "/push/*"]
+  },
+  // 可选：绑定自定义域名。不需要就整段删掉，用默认的 *.workers.dev
+  // "routes": [
+  //   { "pattern": "your-domain.example.com", "custom_domain": true }
+  // ],
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ascmonitor",
+      // npx wrangler d1 create ascmonitor 后把返回的 id 填这里
+      "database_id": "<your-d1-database-id>"
+    }
+  ],
+  "triggers": {
+    // 免费层最多 5 个 cron：按频率分档，用 4 留 1
+    "crons": [
+      "*/15 * * * *", // 评论抓取 + 高频告警
+      "0 * * * *",    // 预留（P5 ASO：关键词/榜单）
+      "0 1 * * *",    // 统一预算调度：FX + rollup + 告警 + 日报 + 清理 + ratings + sales + 构建状态对账
+      "0 3 * * 1"     // weekly：LTV cohort 物化
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

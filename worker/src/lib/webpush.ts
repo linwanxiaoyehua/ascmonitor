@@ -114,18 +114,23 @@ async function encryptPayload(
   return concat(header, ciphertext)
 }
 
+/** VAPID subject 缺省值：规范要求是有效的 mailto: 或 https: URL，推送服务商仅在
+    投递异常时用它联系站点方。部署方可在 config 表写 vapid_subject 覆盖。
+    不硬编码具体域名或邮箱 —— 那属于部署方私有信息，不该进版本库。 */
+const DEFAULT_VAPID_SUBJECT = 'https://example.com'
+
 export async function sendWebPush(
   keys: VapidKeys,
   subscription: PushSubscriptionRow,
   payload: string,
-  ttl = 86400
+  ttl = 86400,
+  subject = DEFAULT_VAPID_SUBJECT
 ): Promise<void> {
   const body = await encryptPayload(
     new TextEncoder().encode(payload),
     b64urlDecode(subscription.p256dh),
     b64urlDecode(subscription.auth)
   )
-  const subject = 'mailto:ops@example.com'
   const res = await fetch(subscription.endpoint, {
     method: 'POST',
     headers: {

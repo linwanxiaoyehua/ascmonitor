@@ -1,24 +1,25 @@
-import { useEffect, useState } from 'react'
-import { getToken, setToken, api } from './lib/api'
-import { Icon, type IconName } from './components/Icon'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Route, Switch } from 'wouter'
+import { api, getToken, setToken } from './lib/api'
+import { UNAUTHORIZED_EVENT } from './lib/query'
+import { AppShell } from './components/AppShell'
+import { Icon } from './components/Icon'
+import { Skeleton } from './components/ui'
+import { Toaster } from './lib/toast'
 import { OverviewPage } from './pages/Overview'
-import { RevenuePage } from './pages/Revenue'
-import { ReviewsPage } from './pages/Reviews'
-import { AlertsPage } from './pages/Alerts'
-import { SettingsPage } from './pages/Settings'
 
-const TABS: Array<{ key: string; label: string; icon: IconName }> = [
-  { key: 'overview', label: '总览', icon: 'chart' },
-  { key: 'revenue', label: '收入', icon: 'creditCard' },
-  { key: 'reviews', label: '评论', icon: 'message' },
-  { key: 'alerts', label: '告警', icon: 'bell' },
-  { key: 'settings', label: '设置', icon: 'settings' },
-]
+// 非首屏页面按路由懒加载
+const RevenuePage = lazy(() => import('./pages/revenue').then((m) => ({ default: m.RevenuePage })))
+const ReviewsPage = lazy(() => import('./pages/Reviews').then((m) => ({ default: m.ReviewsPage })))
+const ActivityPage = lazy(() => import('./pages/Activity').then((m) => ({ default: m.ActivityPage })))
+const SettingsPage = lazy(() => import('./pages/settings').then((m) => ({ default: m.SettingsPage })))
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
   const [initializing, setInitializing] = useState(false)
+  const [newToken, setNewToken] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const tryLogin = async () => {
     setToken(input.trim())
@@ -32,11 +33,11 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
   const trySetup = async () => {
     setInitializing(true)
+    setError('')
     try {
       const { token } = await api<{ token: string }>('/api/setup', { method: 'POST' })
       setToken(token)
-      alert(`初始化成功，请妥善保存 Token：\n${token}`)
-      onLogin()
+      setNewToken(token)
     } catch {
       setError('已初始化过，请输入现有 Token')
     } finally {
@@ -44,12 +45,44 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     }
   }
 
+  const copyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(newToken)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* 复制失败时用户仍可手动选中 */ }
+  }
+
+  // 初始化成功：页面内展示 Token（只显示一次，替代原生 alert）
+  if (newToken) {
+    return (
+      <div className="shell-main login-screen">
+        <div className="login-icon pos">
+          <Icon name="check" size={44} />
+        </div>
+        <h1 className="t-title center mb-2">初始化成功</h1>
+        <p className="muted center mb-4">
+          这是你的 Access Token，<strong>只显示这一次</strong>，请立即保存
+        </p>
+        <div className="panel token-box">
+          <code className="num t-detail">{newToken}</code>
+        </div>
+        <div className="hstack">
+          <button className="ghost flex-1" onClick={copyToken}>
+            {copied ? '已复制' : '复制 Token'}
+          </button>
+          <button className="primary flex-1" onClick={onLogin}>我已保存，进入</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div style={{ paddingTop: 96 }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, color: 'var(--primary)' }}>
+    <div className="shell-main login-screen">
+      <div className="login-icon accent-text">
         <Icon name="chart" size={44} />
       </div>
-      <h1 className="page-title" style={{ textAlign: 'center' }}>ASCMonitor</h1>
+      <h1 className="t-title center mb-5">ASCMonitor</h1>
       <div className="field">
         <label htmlFor="token-input">Access Token</label>
         <input
@@ -61,10 +94,18 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
         />
       </div>
       {error && <div className="error" role="alert">{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button className="primary" style={{ flex: 1 }} onClick={tryLogin}>登录</button>
+      <div className="hstack">
+        <button className="primary flex-1" onClick={tryLogin}>登录</button>
         <button className="ghost" onClick={trySetup} disabled={initializing}>首次初始化</button>
       </div>
+    </div>
+  )
+}
+
+function PageFallback() {
+  return (
+    <div className="mt-4">
+      <Skeleton variant="rows" count={5} />
     </div>
   )
 }
@@ -72,7 +113,6 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 export function App() {
   const [authed, setAuthed] = useState(false)
   const [checking, setChecking] = useState(true)
-  const [tab, setTab] = useState('overview')
 
   useEffect(() => {
     if (!getToken()) {
@@ -85,31 +125,38 @@ export function App() {
       .finally(() => setChecking(false))
   }, [])
 
+  // 任意请求 401 → 回登录页（token 失效 / 被重置）
+  useEffect(() => {
+    const onUnauthorized = () => setAuthed(false)
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
+  }, [])
+
   if (checking) return null
-  if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />
+  if (!authed) {
+    return (
+      <>
+        <LoginScreen onLogin={() => setAuthed(true)} />
+        <Toaster />
+      </>
+    )
+  }
 
   return (
     <>
-      <main>
-        {tab === 'overview' && <OverviewPage />}
-        {tab === 'revenue' && <RevenuePage />}
-        {tab === 'reviews' && <ReviewsPage />}
-        {tab === 'alerts' && <AlertsPage />}
-        {tab === 'settings' && <SettingsPage />}
-      </main>
-      <nav className="tabbar" aria-label="主导航">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={tab === t.key ? 'active' : ''}
-            aria-current={tab === t.key ? 'page' : undefined}
-            onClick={() => setTab(t.key)}
-          >
-            <Icon name={t.icon} size={22} />
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <AppShell>
+        <Suspense fallback={<PageFallback />}>
+          <Switch>
+            <Route path="/" component={OverviewPage} />
+            <Route path="/revenue/:sub?" component={RevenuePage} />
+            <Route path="/reviews" component={ReviewsPage} />
+            <Route path="/activity" component={ActivityPage} />
+            <Route path="/settings/:section?" component={SettingsPage} />
+            <Route component={OverviewPage} />
+          </Switch>
+        </Suspense>
+      </AppShell>
+      <Toaster />
     </>
   )
 }

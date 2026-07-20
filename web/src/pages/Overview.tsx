@@ -126,7 +126,11 @@ export function OverviewPage() {
 
       {/* KPI：今日收入 / MRR / 活跃订阅 / 试用中 —— 每张卡通向它自己的下钻页，不重复指向同一处 */}
       <div className="stat-grid kpi span-full">
+        {/* 今日收入是每天最先看的数 —— 桌面占半幅，配 30 天趋势缩略。
+            sparkline 直接复用下方收入趋势的同一份数据，口径切换时两者同步变化 */}
         <StatCard
+          hero
+          spark={trendData.map((d) => d.value)}
           loading={overviewQ.isPending}
           icon="dollar"
           label="今日收入"

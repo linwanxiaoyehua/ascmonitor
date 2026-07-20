@@ -6,6 +6,7 @@ import { Link } from 'wouter'
 import { timeAgo } from '../lib/format'
 import { fmtMoney } from '../lib/money'
 import { Icon, type IconName } from './Icon'
+import { Sparkline } from './Sparkline'
 
 /* ---------- 页面结构 ---------- */
 
@@ -53,7 +54,7 @@ export function CaliberTag({ children }: { children: ReactNode }) {
 /* ---------- StatCard ---------- */
 
 export function StatCard({
-  label, value, delta, badge, icon, loading, onPress, foot,
+  label, value, delta, badge, icon, loading, onPress, foot, spark, hero,
 }: {
   label: string
   value: ReactNode
@@ -63,27 +64,41 @@ export function StatCard({
   loading?: boolean
   onPress?: () => void
   foot?: ReactNode
+  /** 迷你趋势序列。只在 hero 卡展示 —— 小卡塞下 sparkline 会挤掉注脚 */
+  spark?: number[]
+  /** 主 KPI：桌面占双倍宽度，数字更大，右侧带趋势缩略 */
+  hero?: boolean
 }) {
-  if (loading) return <div className="skeleton h-card" aria-hidden="true" />
+  if (loading) return <div className={`skeleton h-card${hero ? ' hero' : ''}`} aria-hidden="true" />
   const inner = (
     <>
-      {badge && <span className="stat-badge">{badge}</span>}
-      <div className="label">
-        {icon && <Icon name={icon} size={13} />}
-        <span className="label-text">{label}</span>
+      <div className="stat-main">
+        <div className="label">
+          {icon && <Icon name={icon} size={13} />}
+          <span className="label-text">{label}</span>
+          {/* 徽标走行内靠右而非绝对定位：卡片变窄时绝对定位会直接压在 label 上，
+              行内布局则由 label-text 的 ellipsis 让位，结构上不可能重叠 */}
+          {badge && <span className="stat-badge">{badge}</span>}
+        </div>
+        <div className="value num">{value}</div>
+        {/* foot 恒占位，避免有无注脚的卡片高度不一致 */}
+        <div className="foot">
+          {delta && <span className={`delta ${delta.direction}`}>{delta.direction === 'up' ? '↑' : '↓'} {delta.text}</span>}
+          {foot}
+        </div>
       </div>
-      <div className="value num">{value}</div>
-      {/* foot 恒占位，避免有无注脚的卡片高度不一致 */}
-      <div className="foot">
-        {delta && <span className={`delta ${delta.direction}`}>{delta.direction === 'up' ? '↑' : '↓'} {delta.text}</span>}
-        {foot}
-      </div>
+      {hero && spark && spark.length > 1 && (
+        <span className="stat-spark" aria-hidden="true">
+          <Sparkline data={spark} height={52} />
+        </span>
+      )}
     </>
   )
+  const cls = `stat-card${hero ? ' hero' : ''}`
   return onPress ? (
-    <button className="stat-card" onClick={onPress}>{inner}</button>
+    <button className={cls} onClick={onPress}>{inner}</button>
   ) : (
-    <div className="stat-card">{inner}</div>
+    <div className={cls}>{inner}</div>
   )
 }
 

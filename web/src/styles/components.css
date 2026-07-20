@@ -194,7 +194,14 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
 /* ---- StatCard ---- */
 .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); }
 /* KPI 组：手机 2 列 → 平板起 4 列 */
-@media (min-width: 768px) { .stat-grid, .stat-grid.kpi { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 768px) {
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+  /* KPI 组用 5 列：主卡占 2（40%），其余三张各占 1，正好一行。
+     试过 6 列（主卡半幅），但小卡只剩 ~165px，装不下「活跃订阅 + ASC·07-19」 */
+  .stat-grid.kpi { grid-template-columns: repeat(5, 1fr); }
+  /* 骨架屏一并命中，否则加载完成时主卡从 1 格跳到 3 格 */
+  .stat-grid.kpi > .hero { grid-column: span 2; }
+}
 /* 成对卡片（版本对比等）恒 2 列 */
 .stat-grid.pair { grid-template-columns: repeat(2, 1fr); }
 @media (min-width: 768px) { .stat-grid.pair { grid-template-columns: repeat(2, 1fr); } }
@@ -215,16 +222,39 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
 }
 button.stat-card { cursor: pointer; font-family: inherit; transition: background var(--dur) var(--ease), transform var(--dur) var(--ease); }
 button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); }
+/* ---- 主 KPI（hero）：桌面占双倍宽度，左文字右趋势 ----
+   趋势图独立占位而非铺在卡片底做背景 —— 背景式会与注脚文字重叠，
+   在「新订 7 · 续费 14 · 退款 1」这种长注脚上尤其糟。 */
+.stat-card .stat-main { display: flex; flex-direction: column; gap: var(--s0-5); min-width: 0; flex: 1; }
+.stat-card.hero { flex-direction: row; align-items: center; gap: var(--s4); }
+.stat-card.hero .value { font-size: var(--fs-10); }
+.stat-card.hero .stat-spark {
+  flex: none;
+  width: 40%; max-width: 180px;
+  color: var(--chart-2); /* 收入=绿，与收入趋势图同色相 */
+  opacity: 0.85;
+}
+.stat-card.hero .stat-spark .spark-line { stroke: currentColor; }
+/* 移动端不做主次：窄屏里双倍宽等于占满整行，反而挤掉其余 KPI */
+@media (max-width: 767px) {
+  /* 375px 下小卡仅 ~165px，「活跃订阅 + ASC·07-19」放不下会把 label 截成「活跃...」。
+     图标是装饰（label 已说明是什么），口径徽标和 label 都是信息 —— 牺牲图标保信息。
+     只对带徽标的卡生效，其余卡保留图标。 */
+  .stat-card:has(.stat-badge) .label svg { display: none; }
+  .stat-card.hero { flex-direction: column; align-items: stretch; gap: var(--s0-5); }
+  .stat-card.hero .value { font-size: var(--fs-9); }
+  .stat-card.hero .stat-spark { display: none; }
+}
+
 .stat-card .label {
   display: flex; align-items: center; gap: var(--s1);
   font-size: var(--fs-2); font-weight: var(--fw-medium); color: var(--text-2);
   white-space: nowrap; overflow: hidden; min-width: 0;
-  padding-right: var(--s2); /* 给右上角 badge 留位 */
 }
 .stat-card .label svg { flex: none; color: var(--text-3); }
 .stat-card .label-text { overflow: hidden; text-overflow: ellipsis; }
-/* 口径徽标等收纳到卡片右上角，不再挤压 label 行 */
-.stat-card .stat-badge { position: absolute; top: var(--s3); right: var(--s3); }
+/* 口径徽标在 label 行内靠右，长 label 由 ellipsis 让位 */
+.stat-card .stat-badge { margin-left: auto; flex: none; }
 .stat-card .value {
   font-size: var(--fs-9); font-weight: var(--fw-bold);
   letter-spacing: -0.025em;

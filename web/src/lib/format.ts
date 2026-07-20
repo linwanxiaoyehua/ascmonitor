@@ -72,6 +72,17 @@ export function timeAgo(ts: number): string {
   return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}年${md}`
 }
 
+/**
+ * 本地时区的 YYYY-MM-DD —— 按天分组的稳定键（dayLabel 是给人看的，同一天可能重名跨年）
+ * 与 /api/activity/day-totals 的 tz_offset 聚合口径必须一致
+ */
+export function dayKey(ts: number): string {
+  const d = new Date(ts)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
 /** 按天分组标签："今天" / "昨天" / "7月2日" */
 export function dayLabel(ts: number): string {
   const days = dayDiff(ts)

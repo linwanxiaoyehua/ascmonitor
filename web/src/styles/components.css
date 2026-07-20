@@ -681,6 +681,16 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   font-variant-numeric: tabular-nums;
 }
 .group-label .count { color: var(--text-3); font-weight: var(--fw-medium); }
+/* 动态页：当日收入合计，靠右对齐在日期同一行 */
+.group-label .day-total {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semi);
+  letter-spacing: -0.02em;
+  color: var(--success);
+}
+.group-label .day-total.neg { color: var(--danger); }
 
 /* ---- 动态页按天分组 ---- */
 .day-group { margin-top: var(--s4); }

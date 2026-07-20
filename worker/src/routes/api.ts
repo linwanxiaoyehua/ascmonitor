@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
-import { getOverview, fxRates } from '../lib/metrics'
+import { getOverview, fxRates, toUsd } from '../lib/metrics'
 import { fetchReviewsJob } from '../jobs/fetch-reviews'
 import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
 import { fetchSalesJob } from '../jobs/fetch-sales'
@@ -127,6 +127,11 @@ const ACTIVITY_KIND_TYPES: Record<string, string[]> = {
   refund: ['REFUND', 'REFUND_DECLINED', 'REFUND_REVERSED', 'REVOKE', 'CONSUMPTION_REQUEST'],
 }
 
+// 动态流里「会显示金额」的事件类型。
+// 刻意不等于 ACTIVITY_KIND_TYPES.revenue（那份含 OFFER_REDEEMED，但列表行不给它标金额），
+// 必须与 web/src/lib/format.ts 的 REVENUE_TYPES 保持一致，否则当日合计对不上各行。
+const AMOUNT_EVENT_TYPES = ['SUBSCRIBED', 'DID_RENEW', 'ONE_TIME_CHARGE', 'REFUND']
+
 api.get('/activity', async (c) => {
   const before = Number(c.req.query('before') ?? Date.now() + 1)
   const limit = Math.min(Number(c.req.query('limit') ?? 50), 200)
@@ -210,6 +215,49 @@ api.get('/activity', async (c) => {
 
   const merged = (await Promise.all(queries)).flat().sort((a, b) => b.ts - a.ts).slice(0, limit)
   return c.json({ items: merged, nextBefore: merged.length === limit ? merged[merged.length - 1].ts : null })
+})
+
+// 动态页按天分组的当日收入合计。
+// 刻意不复用 metrics_daily：那张表按 UTC 日 + purchase_date 聚合，而动态流按
+// 客户端本地日 + received_at 分组 —— 直接套会错位（UTC+8 早上「今天」几乎为 0）。
+// 这里按传入的时区偏移、用与列表完全相同的过滤条件重算，保证表头数字 = 其下各行之和。
+api.get('/activity/day-totals', async (c) => {
+  const days = Math.min(Number(c.req.query('days') ?? 30), 90)
+  // 客户端传 new Date().getTimezoneOffset()：UTC+8 为 -480（分钟，UTC 之后为负）
+  const raw = Number(c.req.query('tz_offset') ?? 0)
+  const tzOffsetMin = Number.isFinite(raw) ? Math.max(-840, Math.min(840, raw)) : 0
+  const appId = c.req.query('app_id')
+  const includeSandbox = c.req.query('sandbox') !== '0'
+
+  const conditions = ['n.received_at >= ?', `n.type IN (${AMOUNT_EVENT_TYPES.map(() => '?').join(',')})`]
+  const binds: unknown[] = [Date.now() - days * 86400_000, ...AMOUNT_EVENT_TYPES]
+  if (appId) { conditions.push('n.app_id = ?'); binds.push(Number(appId)) }
+  if (!includeSandbox) conditions.push(`json_extract(n.decoded_json, '$.data.environment') != 'Sandbox'`)
+
+  const rows = await c.env.DB.prepare(
+    `SELECT n.type, n.received_at, t.price_milli, t.currency
+     FROM notifications_raw n
+     JOIN transactions t ON t.raw_uuid = n.uuid
+     WHERE ${conditions.join(' AND ')}`
+  )
+    .bind(...binds)
+    .all<{ type: string; received_at: number; price_milli: number | null; currency: string | null }>()
+
+  const fx = await fxRates(c.env.DB)
+  const totals = new Map<string, { usdMilli: number; count: number }>()
+  for (const r of rows.results) {
+    if (!r.price_milli) continue // 0 元交易（免费试用开始）列表里也不显示金额
+    // 位移到本地时区后再取 UTC 日期串，等价于客户端的 dayKey()
+    const date = new Date(r.received_at - tzOffsetMin * 60_000).toISOString().slice(0, 10)
+    const agg = totals.get(date) ?? { usdMilli: 0, count: 0 }
+    const usd = toUsd(r.price_milli, r.currency, fx)
+    agg.usdMilli += r.type === 'REFUND' ? -usd : usd
+    agg.count++
+    totals.set(date, agg)
+  }
+  return c.json(
+    [...totals].map(([date, v]) => ({ date, usdMilli: Math.round(v.usdMilli), count: v.count }))
+  )
 })
 
 // P3 收入深化：订阅健康（续订率 / Churn / 退款率），即时计算

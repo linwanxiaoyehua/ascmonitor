@@ -34,6 +34,13 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return res.json() as Promise<T>
 }
 
+/** 动态页按天分组的当日金额合计（USD 毫，退款已抵扣，可为负） */
+export interface DayTotal {
+  date: string
+  usdMilli: number
+  count: number
+}
+
 export interface Overview {
   todayRevenueUsdMilli: number
   mrrUsdMilli: number

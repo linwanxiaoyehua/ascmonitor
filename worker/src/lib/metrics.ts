@@ -67,7 +67,7 @@ function invertRates(usdToX: Record<string, number>): Record<string, number> {
   return out
 }
 
-function toUsd(priceMilli: number | null, currency: string | null, fx: Record<string, number>): number {
+export function toUsd(priceMilli: number | null, currency: string | null, fx: Record<string, number>): number {
   if (priceMilli == null) return 0
   return priceMilli * (fx[currency ?? 'USD'] ?? 0)
 }

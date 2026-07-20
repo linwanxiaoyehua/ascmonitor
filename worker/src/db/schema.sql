@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS transactions (
   purchase_date INTEGER,
   expires_date INTEGER,
   event_type TEXT NOT NULL,     -- 触发本条记录的 ASSN notificationType
+  event_subtype TEXT,           -- ASSN subtype（UPGRADE/DOWNGRADE/INITIAL_BUY…）
+  offer_type INTEGER,           -- 1=介绍性优惠 2=促销优惠 3=优惠码
+  offer_discount_type TEXT,     -- FREE_TRIAL / PAY_AS_YOU_GO / PAY_UP_FRONT
+  is_trial INTEGER NOT NULL DEFAULT 0, -- 免费试用期交易
   refunded INTEGER NOT NULL DEFAULT 0,
   raw_uuid TEXT                 -- 关联 notifications_raw.uuid
 );
@@ -60,7 +64,12 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   country TEXT,
   started_at INTEGER,
   expires_at INTEGER,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  pending_product_id TEXT,      -- 降级后下期生效的产品
+  price_increase_status TEXT,   -- PENDING / ACCEPTED（涨价同意状态）
+  trial_started_at INTEGER,     -- 试用开始（Trial 漏斗）
+  converted_at INTEGER,         -- 试用转正时间（Trial 漏斗）
+  expiration_intent TEXT        -- 过期原因 subtype（VOLUNTARY / BILLING_ERROR…）
 );
 CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);
 
@@ -92,7 +101,11 @@ CREATE TABLE IF NOT EXISTS reviews (
   review_version TEXT,
   created_at INTEGER,
   updated_at INTEGER,
-  fetched_at INTEGER NOT NULL
+  fetched_at INTEGER NOT NULL,
+  dup_of TEXT,                  -- asc/rss 双源同评论：指向 canonical 评论 id
+  response_body TEXT,           -- 开发者回复（仅 asc 源可回复）
+  response_state TEXT,          -- NULL=无回复 | PENDING_PUBLISH | PUBLISHED
+  responded_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_reviews_app_time ON reviews(app_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(app_id, rating);
@@ -149,17 +162,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
 
--- cron 任务表（队列语义：游标分片、重试、死信）
-CREATE TABLE IF NOT EXISTS jobs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind TEXT NOT NULL,
-  params_json TEXT NOT NULL DEFAULT '{}',
-  cursor TEXT,
-  run_after INTEGER NOT NULL DEFAULT 0,
-  attempts INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'pending'  -- pending | running | done | dead
-);
-CREATE INDEX IF NOT EXISTS idx_jobs_pending ON jobs(status, run_after);
+-- （原 jobs 队列表已删除：config 游标模式覆盖分片语义，见 0002 迁移）
 
 -- ASC 每日销售报告（账单口径：Apple 实际结算）
 CREATE TABLE IF NOT EXISTS sales_daily (
@@ -171,6 +174,34 @@ CREATE TABLE IF NOT EXISTS sales_daily (
   proceeds_milli INTEGER NOT NULL DEFAULT 0, -- 开发者分成（毫单位，原币种）
   currency TEXT NOT NULL DEFAULT 'USD',
   PRIMARY KEY (date, apple_id, country, product_type, currency)
+);
+
+-- 版本发布历史（daily Lookup diff 写入，见 0005 迁移）
+CREATE TABLE IF NOT EXISTS app_releases (
+  app_id INTEGER NOT NULL,
+  version TEXT NOT NULL,
+  released_at INTEGER,
+  first_seen_at INTEGER NOT NULL,
+  PRIMARY KEY (app_id, version)
+);
+
+-- 产品目录：product_id → 名称（ASC API 每日同步，见 0004 迁移）
+CREATE TABLE IF NOT EXISTS products (
+  product_id TEXT PRIMARY KEY,
+  app_id INTEGER,
+  name TEXT NOT NULL,            -- ASC referenceName
+  type TEXT,                     -- subscription | CONSUMABLE | NON_CONSUMABLE | NON_RENEWING_SUBSCRIPTION
+  fetched_at INTEGER NOT NULL
+);
+
+-- LTV 月 cohort 物化（weekly cron 全量重算，见 0003 迁移）
+CREATE TABLE IF NOT EXISTS cohorts (
+  app_id INTEGER NOT NULL,
+  cohort_month TEXT NOT NULL,      -- YYYY-MM（订阅 started_at 所在 UTC 月）
+  subs INTEGER NOT NULL DEFAULT 0,
+  revenue_milli_cum INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  PRIMARY KEY (app_id, cohort_month)
 );
 
 -- ASC 订阅状态日快照（补全 Webhook 上线前的存量订阅）

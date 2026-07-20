@@ -171,6 +171,60 @@ export async function fetchSubscriptionReport(
   })
 }
 
+export interface AscProduct {
+  productId: string
+  name: string
+  type: string
+}
+
+/**
+ * 拉取 App 的产品目录：自动续订订阅（subscriptionGroups?include=subscriptions）+ 内购（inAppPurchasesV2）。
+ * name 为 ASC referenceName（开发者内部名，展示层替代裸 product_id）。
+ */
+export async function fetchProducts(creds: AscCredentials, ascAppId: string): Promise<AscProduct[]> {
+  const jwt = await ascJwt(creds)
+  const headers = { Authorization: `Bearer ${jwt}` }
+  const products: AscProduct[] = []
+
+  // 订阅：include 展开每个订阅组下的 subscriptions
+  const subsRes = await fetch(
+    `https://api.appstoreconnect.apple.com/v1/apps/${ascAppId}/subscriptionGroups?include=subscriptions&limit=50`,
+    { headers }
+  )
+  if (subsRes.ok) {
+    const json = (await subsRes.json()) as {
+      included?: Array<{ type: string; attributes?: { name?: string; productId?: string } }>
+    }
+    for (const item of json.included ?? []) {
+      if (item.type === 'subscriptions' && item.attributes?.productId && item.attributes.name) {
+        products.push({ productId: item.attributes.productId, name: item.attributes.name, type: 'subscription' })
+      }
+    }
+  }
+
+  // 内购（消耗型 / 买断 / 非续订订阅）
+  const iapRes = await fetch(
+    `https://api.appstoreconnect.apple.com/v1/apps/${ascAppId}/inAppPurchasesV2?limit=200`,
+    { headers }
+  )
+  if (iapRes.ok) {
+    const json = (await iapRes.json()) as {
+      data?: Array<{ attributes?: { name?: string; productId?: string; inAppPurchaseType?: string } }>
+    }
+    for (const item of json.data ?? []) {
+      if (item.attributes?.productId && item.attributes.name) {
+        products.push({
+          productId: item.attributes.productId,
+          name: item.attributes.name,
+          type: item.attributes.inAppPurchaseType ?? 'iap',
+        })
+      }
+    }
+  }
+
+  return products
+}
+
 export interface AscReview {
   id: string
   attributes: {
@@ -181,9 +235,19 @@ export interface AscReview {
     createdDate: string
     territory: string
   }
+  relationships?: { response?: { data?: { id: string } | null } }
+  /** 由 included 解析附加（开发者回复） */
+  responseBody?: string | null
+  responseState?: string | null
 }
 
-/** 拉取 App 的客户评论（按创建时间倒序，一页最多 200 条） */
+interface ReviewResponseResource {
+  id: string
+  type: string
+  attributes?: { responseBody?: string; state?: string }
+}
+
+/** 拉取 App 的客户评论（按创建时间倒序，一页最多 200 条）；include=response 同步开发者回复状态 */
 export async function fetchCustomerReviews(
   creds: AscCredentials,
   ascAppId: string,
@@ -191,9 +255,40 @@ export async function fetchCustomerReviews(
 ): Promise<{ reviews: AscReview[]; nextCursor: string | null }> {
   const url = cursor
     ? cursor
-    : `https://api.appstoreconnect.apple.com/v1/apps/${ascAppId}/customerReviews?sort=-createdDate&limit=200`
+    : `https://api.appstoreconnect.apple.com/v1/apps/${ascAppId}/customerReviews` +
+      `?sort=-createdDate&limit=200&include=response&fields[customerReviewResponses]=responseBody,state`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${await ascJwt(creds)}` } })
   if (!res.ok) throw new Error(`ASC API ${res.status}: ${await res.text()}`)
-  const json = (await res.json()) as { data: AscReview[]; links?: { next?: string } }
+  const json = (await res.json()) as { data: AscReview[]; included?: ReviewResponseResource[]; links?: { next?: string } }
+
+  // included 里的回复按 id 索引，回填到对应评论
+  const responses = new Map<string, ReviewResponseResource>()
+  for (const inc of json.included ?? []) {
+    if (inc.type === 'customerReviewResponses') responses.set(inc.id, inc)
+  }
+  for (const r of json.data) {
+    const respId = r.relationships?.response?.data?.id
+    const resp = respId ? responses.get(respId) : undefined
+    r.responseBody = resp?.attributes?.responseBody ?? null
+    r.responseState = resp?.attributes?.state ?? null
+  }
   return { reviews: json.data, nextCursor: json.links?.next ?? null }
+}
+
+/** 发布/更新对某条评论的开发者回复（需 Admin / App Manager / Customer Support 角色的 Key） */
+export async function postReviewResponse(creds: AscCredentials, reviewId: string, body: string): Promise<string> {
+  const res = await fetch('https://api.appstoreconnect.apple.com/v1/customerReviewResponses', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await ascJwt(creds)}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: {
+        type: 'customerReviewResponses',
+        attributes: { responseBody: body },
+        relationships: { review: { data: { type: 'customerReviews', id: reviewId } } },
+      },
+    }),
+  })
+  if (!res.ok) throw new Error(`review response ${res.status}: ${await res.text()}`)
+  const json = (await res.json()) as { data?: { attributes?: { state?: string } } }
+  return json.data?.attributes?.state ?? 'PENDING_PUBLISH'
 }

@@ -60,15 +60,23 @@ export async function lookupAppInfo(query: { bundleId?: string; id?: string }, c
 export interface LookupResult {
   averageUserRating: number
   userRatingCount: number
+  /** 当前版本号与发布时间（版本对比用；随评分 Lookup 顺带取，0 额外请求） */
+  version: string | null
+  currentVersionReleaseDate: string | null
 }
 
-/** Lookup：某国家的评分汇总 */
+/** Lookup：某国家的评分汇总（+ 当前版本信息） */
 export async function fetchRatingSummary(ascAppId: string, country: string): Promise<LookupResult | null> {
   const url = `https://itunes.apple.com/lookup?id=${ascAppId}&country=${country}`
   const res = await fetch(url, { headers: { 'User-Agent': UA } })
   if (!res.ok) return null
-  const json = (await res.json()) as { resultCount: number; results: Array<Record<string, number>> }
+  const json = (await res.json()) as { resultCount: number; results: Array<Record<string, unknown>> }
   if (!json.resultCount) return null
   const app = json.results[0]
-  return { averageUserRating: app.averageUserRating ?? 0, userRatingCount: app.userRatingCount ?? 0 }
+  return {
+    averageUserRating: (app.averageUserRating as number) ?? 0,
+    userRatingCount: (app.userRatingCount as number) ?? 0,
+    version: (app.version as string) ?? null,
+    currentVersionReleaseDate: (app.currentVersionReleaseDate as string) ?? null,
+  }
 }

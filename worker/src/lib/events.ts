@@ -214,7 +214,8 @@ export function buildSubStatement(
 function buildBody(
   appName: string | null,
   bundleId: string | undefined,
-  tx: TransactionInfo | null
+  tx: TransactionInfo | null,
+  productName: string | null
 ): string {
   const parts: string[] = []
   // App 名可读（非 bundleId 占位）就用名字，否则退回 bundleId 末段
@@ -222,7 +223,8 @@ function buildBody(
   if (app) parts.push(app)
 
   const product = [
-    productDisplay(tx?.productId, bundleId ?? tx?.bundleId),
+    // products 目录里的正式名优先，未同步到时回退 product_id 末段
+    productName ?? productDisplay(tx?.productId, bundleId ?? tx?.bundleId),
     periodLabel(tx ? inferPeriod(tx) : null),
     money(tx?.price, tx?.currency),
   ]
@@ -292,9 +294,19 @@ export async function processNotification(
     await db.batch(stmts)
   }
 
+  // 产品正式名（fetch-products 每日同步的 ASC referenceName）
+  let productName: string | null = null
+  if (tx?.productId) {
+    const row = await db
+      .prepare('SELECT name FROM products WHERE product_id = ?')
+      .bind(tx.productId)
+      .first<{ name: string }>()
+    productName = row?.name ?? null
+  }
+
   const titleFn = NOTIFY_TITLES[type]
   const title = titleFn?.(subtype) ?? null
-  const body = buildBody(appName, bundleId, tx)
+  const body = buildBody(appName, bundleId, tx, productName)
   return {
     title: title ?? `${type}${subtype ? `/${subtype}` : ''}`,
     body,

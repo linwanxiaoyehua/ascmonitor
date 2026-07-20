@@ -29,10 +29,13 @@
   --shadow-pop: 0 4px 16px light-dark(rgba(23, 32, 50, 0.12), rgba(0, 0, 0, 0.5));
   --shadow-float: 0 6px 24px light-dark(rgba(23, 32, 50, 0.14), rgba(0, 0, 0, 0.5));
 
-  /* ---- 文本三级 ---- */
+  /* ---- 文本三级（alpha 由 WCAG 反解，对 surface / app / raised 三种底都达标）----
+     1 正文 16.9:1 · 2 次要文本 ≥4.5:1（AA 正文）· 3 仅装饰 ≥3:1（图形/描边标准）
+     ⚠ --text-3 达不到正文 AA，只能用于图标、分隔符、placeholder 这类非必读元素；
+       承载信息的文字（时间戳、指标名、计数）一律用 --text-2 */
   --text-1: light-dark(#181d29, #e9edf5);
-  --text-2: light-dark(rgba(38, 48, 68, 0.64), rgba(183, 197, 220, 0.64));
-  --text-3: light-dark(rgba(38, 48, 68, 0.4), rgba(183, 197, 220, 0.38));
+  --text-2: light-dark(rgba(38, 48, 68, 0.7), rgba(183, 197, 220, 0.66));
+  --text-3: light-dark(rgba(38, 48, 68, 0.53), rgba(183, 197, 220, 0.47));
 
   /* ---- 品牌 accent（靛紫，区别于 App Store 蓝） ---- */
   --accent: light-dark(#4c59df, #7d8aff);
@@ -76,6 +79,7 @@
   --fs-3: 13px;
   --fs-4: 14px;
   --fs-5: 15px;
+  --fs-5-5: 16px; /* 表单输入专用：iOS 聚焦自动放大的阈值，勿下调 */
   --fs-6: 17px;
   --fs-7: 20px;
   --fs-8: 22px;

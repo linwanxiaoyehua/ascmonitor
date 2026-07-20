@@ -11,13 +11,38 @@ export function isOverlayOpen(): boolean {
   return openCount > 0
 }
 
+const FOCUSABLE =
+  'a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
 export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
+  // 调用方普遍传内联箭头函数，onClose 每次渲染都是新引用 —— 绝不能进依赖数组，
+  // 否则弹层内每敲一个字都会重跑 effect，把焦点从输入框抢回容器（只能输入一个字符）
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
     const restoreTo = document.activeElement as HTMLElement | null
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return onCloseRef.current()
+      // 焦点陷阱：aria-modal 只约束读屏，键盘 Tab 仍会走到背后的页面上去
+      if (e.key !== 'Tab' || !ref.current) return
+      const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
+      if (!items.length) {
+        e.preventDefault()
+        return ref.current.focus()
+      }
+      const [first, last] = [items[0], items[items.length - 1]]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === ref.current)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
     document.addEventListener('keydown', onKey)
     openCount += 1
     document.body.style.overflow = 'hidden'
@@ -29,7 +54,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
       if (openCount === 0) document.body.style.overflow = ''
       restoreTo?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return createPortal(

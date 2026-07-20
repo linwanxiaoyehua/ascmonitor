@@ -3,6 +3,41 @@
    hover 一律走 @media (hover: hover) —— 按输入能力而非宽度，平板接鼠标也能有反馈
    ====================================== */
 
+/* ---- 命中区扩展（等价 iOS hitSlop）----
+   紧凑 dashboard 里把控件本身撑到 44px 会毁掉信息密度，所以视觉尺寸不动，
+   用伪元素把可点区域补足到 --tap。分两类：
+   · 孤立图标按钮 —— 全向扩展
+   · 水平密集控件（分段控件、筛选 chip、开关）—— 只扩纵向，
+     横向扩展会让相邻项的命中区互相重叠，边界处反而更容易点错 */
+.topbar-action,
+.sheet .sheet-head .close,
+.app-chip { position: relative; }
+.topbar-action::after,
+.sheet .sheet-head .close::after,
+.app-chip::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, var(--tap));
+  height: max(100%, var(--tap));
+}
+
+.chip,
+.segmented button,
+.segmented a,
+.switch { position: relative; }
+.chip::before,
+.segmented button::before,
+.segmented a::before,
+.switch::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  transform: translateY(-50%);
+  height: var(--tap);
+}
+
 /* ---- AppShell 布局 ---- */
 .shell-main {
   max-width: var(--w-main);
@@ -126,7 +161,7 @@
   padding: 0 var(--s0-5);
 }
 .section-head .title { font-size: var(--fs-5); font-weight: 650; color: var(--text-1); }
-.section-head .count { font-size: var(--fs-2); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.section-head .count { font-size: var(--fs-2); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .section-head .action {
   margin-left: auto;
   background: none; border: none;
@@ -253,8 +288,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .lrow .amount { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: var(--fw-semi); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .lrow .amount.pos { color: var(--success); }
 .lrow .amount.neg { color: var(--danger); }
-.lrow .time { font-size: var(--fs-2); color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; margin-top: 1px; }
-.lrow > .time { font-size: var(--fs-3); color: var(--text-3); margin: 0; }
+.lrow .time { font-size: var(--fs-2); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; margin-top: 1px; }
+.lrow > .time { font-size: var(--fs-3); color: var(--text-2); margin: 0; }
 .lrow .chevron { color: var(--text-3); flex: none; transition: transform var(--dur) var(--ease); }
 .lrow .chevron.open { transform: rotate(90deg); }
 /* 行右侧文字动作（如「复制」） */
@@ -323,7 +358,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .timeline-dot.neg { background: var(--danger); }
 .timeline-label { color: var(--text-1); }
 .timeline-amount { color: var(--text-2); margin-left: auto; }
-.timeline-time { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.timeline-time { color: var(--text-2); font-variant-numeric: tabular-nums; }
 
 /* ---- SegmentedControl / SegmentedLinks ---- */
 .segmented {
@@ -391,7 +426,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 }
 .chip:active { transform: scale(0.96); }
 .chip:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
-.chip .num { color: var(--text-3); margin-left: var(--s0-5); }
+.chip .num { color: var(--text-2); margin-left: var(--s0-5); }
 .chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .chip.active .num { color: var(--accent); opacity: 0.7; }
 
@@ -675,12 +710,12 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 /* ---- 三级分组头（列表内分组：明细状态组 / 动态按天分组） ---- */
 .group-label {
   display: flex; align-items: baseline; gap: var(--s2);
-  font-size: var(--fs-2); font-weight: var(--fw-semi); color: var(--text-3);
+  font-size: var(--fs-2); font-weight: var(--fw-semi); color: var(--text-2);
   margin: var(--s4) 0 var(--s2);
   padding: 0 var(--s0-5);
   font-variant-numeric: tabular-nums;
 }
-.group-label .count { color: var(--text-3); font-weight: var(--fw-medium); }
+.group-label .count { color: var(--text-2); font-weight: var(--fw-medium); }
 /* 动态页：当日收入合计，靠右对齐在日期同一行 */
 .group-label .day-total {
   margin-left: auto;
@@ -732,7 +767,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .app-ov-metrics { display: flex; gap: var(--s5); flex: none; }
 .app-ov-metric { text-align: right; }
 .app-ov-metric .v { display: block; font-family: var(--font-mono); font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--text-1); font-variant-numeric: tabular-nums; }
-.app-ov-metric .k { font-size: var(--fs-1); color: var(--text-3); }
+.app-ov-metric .k { font-size: var(--fs-1); color: var(--text-2); }
 @media (max-width: 400px) { .app-ov-metrics { gap: var(--s3); } .app-ov-metric.opt { display: none; } }
 
 /* ---- 相关模块聚合：组间 28 > 模块间 24 > 组内 16 ---- */
@@ -861,16 +896,26 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   .topbar-inner, .shell-main { max-width: var(--w-main-lg); }
   .shell-main { padding: var(--s5) var(--s6) var(--s8); }
 
-  /* 桌面：所有页标题上移顶栏面包屑（侧边栏已指示位置），页内页头只保留操作区 */
+  /* 桌面：页标题上移顶栏面包屑（侧边栏已指示位置），页内页头只保留操作区。
+     h1 只做视觉隐藏，不能 display:none —— 否则整个桌面端在无障碍树里一个标题都没有，
+     读屏用户失去「按标题跳转」这条主要导航手段。返回按钮/副标题才是真隐藏（侧边栏已接管）。 */
   .topbar-crumb { display: flex; }
-  .page-header { display: none; }
+  .page-header { display: block; padding: 0; }
+  .page-header > h1 {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .page-header > .subtitle,
+  .page-header > .back-btn { display: none; }
   .page-header.has-actions {
     display: flex;
     justify-content: flex-end;
     padding: 0 0 var(--s2);
   }
-  .page-header.has-actions h1,
-  .page-header.has-actions .subtitle { display: none; }
   .page-header.has-actions .actions { margin-left: 0; }
 
   /* ---- 总览 Bento 网格：动态占 3/5，趋势+下载占 2/5 ---- */

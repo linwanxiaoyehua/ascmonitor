@@ -196,7 +196,7 @@ export function OverviewPage() {
           <div className="chart-frame">
             <div className="head">
               <span className="total num">{fmtUsd(trendTotal)}</span>
-              <span className="label">30 天合计</span>
+              <span className="label">30 天合计{trendCaliber === 'billed' ? ' · 账单' : ''}</span>
             </div>
             {metricsQ.isPending ? (
               <Skeleton variant="chart" height={170} />
@@ -204,7 +204,7 @@ export function OverviewPage() {
               <TrendChart
                 type="area"
                 data={trendData}
-                series={[{ key: 'value', name: '收入', color: trendCaliber === 'billed' ? 'var(--chart-2)' : 'var(--chart-1)' }]}
+                series={[{ key: 'value', name: '收入', color: 'var(--chart-2)' }]}
                 format={fmtUsd}
                 axisFormat={fmtUsdCompact}
                 height={170}

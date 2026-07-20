@@ -52,6 +52,13 @@ const BUILD_BADGES: Record<string, string> = {
   build_appstore: '审核',
 }
 
+/**
+ * 剥掉标题开头的 emoji。
+ * 后端在 title 里带 emoji 是为了推送通知 —— 系统通知只有纯文本，emoji 是那里唯一的视觉线索。
+ * 但动态流每行已经有语义图标了，再显示一遍 emoji 是重复，也违反「不用 emoji 当图标」的规约。
+ */
+const stripLeadingEmoji = (t: string) => t.replace(/^\p{Extended_Pictographic}️?\s*/u, '')
+
 export function ActivityRow({ item }: { item: ActivityItem }) {
   if (item.kind === 'alert') {
     const buildIcon = BUILD_ICONS[item.alertKind]
@@ -74,7 +81,7 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
             <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={16} /></span>
           )
         }
-        title={item.title}
+        title={stripLeadingEmoji(item.title)}
         badges={
           badgeLabel ? (
             <Badge tone={meta.tone === 'accent' ? 'info' : meta.tone}>{badgeLabel}</Badge>

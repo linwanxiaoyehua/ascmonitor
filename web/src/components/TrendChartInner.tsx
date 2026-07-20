@@ -24,7 +24,16 @@ export interface TrendChartProps {
   height?: number
 }
 
-const DEFAULT_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)']
+const DEFAULT_COLORS = [
+  'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)',
+  'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)', 'var(--chart-7)',
+]
+
+/** 数据点少时逐点标记；30 天序列全打点会糊成一片，交给 hover 的 activeDot */
+const DOT_LIMIT = 14
+
+/** 第二条及之后的序列改虚线：色相之外再加一重编码，色盲用户也能区分 */
+const DASH_PATTERNS = [undefined, '5 3', '2 3', '8 3 2 3']
 
 function ChartTooltip({
   active, payload, label, format,
@@ -81,7 +90,16 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
     ),
     grid: <CartesianGrid vertical={false} stroke="var(--chart-grid)" />,
     tooltip: <Tooltip content={<ChartTooltip format={format} />} cursor={{ fill: 'var(--chart-grid)', stroke: 'var(--border-strong)' }} />,
-    legend: showLegend ? <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} /> : null,
+    // 图例文字不能用序列色 —— 那是为 2px 线条调的（3:1），落到 12px 文字上只有 3.1:1。
+    // 色块保留序列色，文字走 --text-2。
+    legend: showLegend ? (
+      <Legend
+        iconType="circle"
+        iconSize={8}
+        wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+        formatter={(value: string) => <span style={{ color: 'var(--text-2)' }}>{value}</span>}
+      />
+    ) : null,
   }
 
   const colorOf = (s: TrendSeries, i: number) => s.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length]
@@ -98,25 +116,38 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
         </BarChart>
       ) : type === 'area' ? (
         <AreaChart data={data} margin={margin}>
-          {/* 渐变填充：顶部 22% → 底部透明（chart 准则：fill ~20% opacity，突出趋势不压数据） */}
-          <defs>
-            {series.map((s, i) => (
-              <linearGradient key={s.key} id={`tc-grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={colorOf(s, i)} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={colorOf(s, i)} stopOpacity={0.02} />
-              </linearGradient>
-            ))}
-          </defs>
+          {/* 不用渐变填充：渐变会把视觉重量压在色块上而非趋势线上。
+              保留 7% 单色底以维持 area 的语义重量，其余交给 2px 描边。 */}
           {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{axisProps.tooltip}{axisProps.legend}
           {series.map((s, i) => (
-            <Area key={s.key} dataKey={s.key} name={s.name} stroke={colorOf(s, i)} fill={`url(#tc-grad-${i})`} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+            <Area
+              key={s.key}
+              dataKey={s.key}
+              name={s.name}
+              stroke={colorOf(s, i)}
+              strokeWidth={2}
+              strokeDasharray={DASH_PATTERNS[i % DASH_PATTERNS.length]}
+              fill={colorOf(s, i)}
+              fillOpacity={0.07}
+              dot={data.length <= DOT_LIMIT ? { r: 2.5, strokeWidth: 0, fill: colorOf(s, i) } : false}
+              activeDot={{ r: 3.5, strokeWidth: 0 }}
+            />
           ))}
         </AreaChart>
       ) : (
         <LineChart data={data} margin={margin}>
           {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{axisProps.tooltip}{axisProps.legend}
           {series.map((s, i) => (
-            <Line key={s.key} dataKey={s.key} name={s.name} stroke={colorOf(s, i)} strokeWidth={2} dot={false} />
+            <Line
+              key={s.key}
+              dataKey={s.key}
+              name={s.name}
+              stroke={colorOf(s, i)}
+              strokeWidth={2}
+              strokeDasharray={DASH_PATTERNS[i % DASH_PATTERNS.length]}
+              dot={data.length <= DOT_LIMIT ? { r: 2.5, strokeWidth: 0, fill: colorOf(s, i) } : false}
+              activeDot={{ r: 3.5, strokeWidth: 0 }}
+            />
           ))}
         </LineChart>
       )}

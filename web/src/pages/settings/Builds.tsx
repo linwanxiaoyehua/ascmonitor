@@ -104,7 +104,12 @@ function StatusRows() {
       {data.map((s) => {
         const meta = SCOPE_META[s.scope] ?? { label: s.scope, icon: 'layers' as IconName }
         // label / tone 由后端算好（lib/build-status 单一事实源），BadgeTone 正好覆盖这五个值
-        const version = [s.version, s.build_number && `(${s.build_number})`].filter(Boolean).join(' ')
+        // 构建号只在有版本号时用括号附注；否则单独成词，避免显示成孤零零的「(128)」
+        const version = s.version
+          ? [s.version, s.build_number && `(${s.build_number})`].filter(Boolean).join(' ')
+          : s.build_number
+            ? `构建 ${s.build_number}`
+            : ''
         return (
           <ListRow
             key={`${s.scope}:${s.entity_id}`}

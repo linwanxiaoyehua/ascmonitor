@@ -14,61 +14,96 @@
 :root[data-theme='dark'] { color-scheme: dark; }
 
 :root {
-  /* ---- 语义层：背景与分层（深色 = 更深的底 + 更亮的面 + 1px 内高光，见 --shadow-card） ---- */
-  --bg-app: light-dark(#f4f5f8, #090c12);
-  --bg-surface: light-dark(#ffffff, #151c28);
-  --bg-raised: light-dark(#eef0f4, #1e2735);
-  --bg-inset: light-dark(#e8eaef, #0d1119);
-  --border-subtle: light-dark(rgba(23, 32, 50, 0.08), rgba(148, 166, 200, 0.13));
-  --border-strong: light-dark(rgba(23, 32, 50, 0.16), rgba(148, 166, 200, 0.24));
-  /* 卡片立体感：顶部 1px 内高光 + 微阴影（浅色只留极淡投影） */
-  --shadow-card: light-dark(
-    0 1px 2px rgba(23, 32, 50, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3)
-  );
-  --shadow-pop: 0 4px 16px light-dark(rgba(23, 32, 50, 0.12), rgba(0, 0, 0, 0.5));
-  --shadow-float: 0 6px 24px light-dark(rgba(23, 32, 50, 0.14), rgba(0, 0, 0, 0.5));
+  /* ---- 语义层：背景与分层 ----
+     灰阶带蓝紫色相（B 通道恒高于 R=G），不是中性灰 —— 这是「温度」的来源，成本为零。
+     分层靠明度差：浅色 = 灰页底 + 白卡片；深色 = 更深的底 + 更亮的面。 */
+  --bg-app: light-dark(#f6f6f8, #0a0a10);
+  --bg-surface: light-dark(#ffffff, #17171f);
+  --bg-raised: light-dark(#f0f0f4, #22222d);
+  --bg-inset: light-dark(#e9e9ef, #101017);
+  --border-subtle: light-dark(rgba(20, 20, 40, 0.08), rgba(150, 150, 180, 0.13));
+  --border-strong: light-dark(rgba(20, 20, 40, 0.16), rgba(150, 150, 180, 0.24));
+  /* 卡片分层用「发丝环」而非 1px 描边：0.5px spread 在 2x 屏上是真正的 1 物理像素，
+     比任何 1px 实线都轻。描边与投影合并进同一个 box-shadow，组件层不再写 border。
+     ⚠️ light-dark() 只接受两个参数，含逗号的复合 box-shadow 直接塞进去会被当成多参数
+        而整条失效（表现为完全没有阴影）。所以只用它包**单个颜色**，复合结构在外层组装。 */
+  --shadow-ambient: light-dark(rgba(9, 9, 13, 0.1), rgba(0, 0, 0, 0.4));
+  --shadow-ring: light-dark(rgba(9, 9, 13, 0.07), rgba(150, 150, 180, 0.2));
+  --shadow-inset: light-dark(transparent, rgba(255, 255, 255, 0.05));
+  --shadow-card:
+    0 1px 3px 0 var(--shadow-ambient),
+    0 0 0 0.5px var(--shadow-ring),
+    inset 0 0.5px 0 0 var(--shadow-inset);
+  --shadow-pop: 0 4px 16px light-dark(rgba(20, 20, 40, 0.12), rgba(0, 0, 0, 0.5));
+  --shadow-float: 0 6px 24px light-dark(rgba(20, 20, 40, 0.14), rgba(0, 0, 0, 0.5));
 
-  /* ---- 文本三级（alpha 由 WCAG 反解，对 surface / app / raised 三种底都达标）----
-     1 正文 16.9:1 · 2 次要文本 ≥4.5:1（AA 正文）· 3 仅装饰 ≥3:1（图形/描边标准）
+  /* 高对比度偏好下发丝环退化为实线 —— 半像素环在此模式下几乎不可见 */
+  @media (prefers-contrast: more) {
+    --shadow-card: 0 0 0 1px var(--text-1);
+  }
+
+  /* ---- 文本三级（墨色同样偏紫；alpha 由 WCAG 反解，对 surface / app / raised 三种底都达标）----
+     1 正文 18:1 · 2 次要文本 ≥4.5:1（AA 正文）· 3 仅装饰 ≥3:1（图形/描边标准）
      ⚠ --text-3 达不到正文 AA，只能用于图标、分隔符、placeholder 这类非必读元素；
-       承载信息的文字（时间戳、指标名、计数）一律用 --text-2 */
-  --text-1: light-dark(#181d29, #e9edf5);
-  --text-2: light-dark(rgba(38, 48, 68, 0.7), rgba(183, 197, 220, 0.66));
-  --text-3: light-dark(rgba(38, 48, 68, 0.53), rgba(183, 197, 220, 0.47));
+       承载信息的文字（时间戳、指标名、计数）一律用 --text-2
+     注：RevenueCat 深色下的次级文本几乎等于纯白、层次是塌的，那条不抄 */
+  --text-1: light-dark(#14141e, #f6f6f8);
+  --text-2: light-dark(rgba(20, 20, 40, 0.64), rgba(240, 240, 248, 0.58));
+  --text-3: light-dark(rgba(20, 20, 40, 0.5), rgba(240, 240, 248, 0.42));
 
-  /* ---- 品牌 accent（靛紫，区别于 App Store 蓝） ---- */
-  --accent: light-dark(#4c59df, #7d8aff);
-  --accent-soft: light-dark(rgba(76, 89, 223, 0.1), rgba(125, 138, 255, 0.14));
-  --accent-line: light-dark(rgba(76, 89, 223, 0.28), rgba(125, 138, 255, 0.32));
-  --on-accent: light-dark(#ffffff, #10131f);
+  /* ---- 品牌 accent（RevenueCat Royal Blue #576cdb）---- */
+  --accent: light-dark(#576cdb, #7f94ff);
+  --accent-soft: light-dark(rgba(87, 108, 219, 0.1), rgba(127, 148, 255, 0.14));
+  --accent-line: light-dark(rgba(87, 108, 219, 0.28), rgba(127, 148, 255, 0.32));
+  --on-accent: light-dark(#ffffff, #0a0a10);
+  /* accent 当**文字**用时的专用档：品牌色 #576cdb 作填充没问题，但落到 11-14px 文字上
+     只有 4.2-4.4:1，差一点点。同色相压暗，且必须在 --accent-soft 底上也达标
+     （侧边栏/TabBar 选中项是 accent 文字叠 accent-soft 背景，比纯色底更苛刻）。 */
+  --accent-text: light-dark(#465dd7, #7f94ff);
+  /* 主按钮是全局唯一的「立体」元素：垂直渐变 + 内高光 + 半透明白描边，
+     在整体扁平的系统里形成唯一视觉焦点 */
+  --accent-grad-top: light-dark(#6b7ee2, #8fa1ff);
+  --accent-grad-bottom: light-dark(#4356c9, #6b82f5);
 
-  /* ---- 功能语义色（每色 默认 / -soft 底 两档） ---- */
-  --success: light-dark(#0e9f4f, #3ddc84);
-  --success-soft: light-dark(rgba(14, 159, 79, 0.1), rgba(61, 220, 132, 0.13));
-  --danger: light-dark(#d92d20, #ff6b62);
-  --danger-soft: light-dark(rgba(217, 45, 32, 0.1), rgba(255, 107, 98, 0.13));
-  --danger-line: light-dark(rgba(217, 45, 32, 0.22), rgba(255, 107, 98, 0.26));
-  --warning: light-dark(#c77414, #ffb454);
-  --warning-soft: light-dark(rgba(199, 116, 20, 0.12), rgba(255, 180, 84, 0.14));
-  --info: light-dark(#0272b6, #57b7ff);
-  --info-soft: light-dark(rgba(2, 114, 182, 0.1), rgba(87, 183, 255, 0.13));
-  --neutral: light-dark(rgba(38, 48, 68, 0.55), rgba(183, 197, 220, 0.55));
-  --neutral-soft: light-dark(rgba(38, 48, 68, 0.08), rgba(183, 197, 220, 0.12));
+  /* ---- 功能语义色 ----
+     文本与图标分开取值：文本用极深/极浅端保证 AA，图标用饱和中间端保持活力。
+     同一个「绿」在 12px 徽标文字上和在 32px 图标上，需要的对比度本来就不同。 */
+  --success: light-dark(#00654d, #5ede9f);
+  --success-icon: light-dark(#009c6a, #11d483);
+  --success-soft: light-dark(rgba(0, 156, 106, 0.1), rgba(17, 212, 131, 0.13));
+  --danger: light-dark(#9e0710, #ffa59f);
+  --danger-icon: light-dark(#e91721, #ff857e);
+  --danger-soft: light-dark(rgba(233, 23, 33, 0.09), rgba(255, 133, 126, 0.13));
+  --danger-line: light-dark(rgba(233, 23, 33, 0.22), rgba(255, 133, 126, 0.26));
+  --warning: light-dark(#7a3a20, #ffb076);
+  --warning-icon: light-dark(#c2620f, #ffb076);
+  --warning-soft: light-dark(rgba(194, 98, 15, 0.12), rgba(255, 176, 118, 0.14));
+  --info: light-dark(#0b5f96, #7cc5ff);
+  --info-icon: light-dark(#0f82c9, #57b7ff);
+  --info-soft: light-dark(rgba(15, 130, 201, 0.1), rgba(87, 183, 255, 0.13));
+  --neutral: light-dark(rgba(20, 20, 40, 0.58), rgba(240, 240, 248, 0.5));
+  --neutral-soft: light-dark(rgba(20, 20, 40, 0.07), rgba(240, 240, 248, 0.1));
 
-  /* ---- 图表色板（独立于 UI 语义色；正/负走势固定绿/红但色阶不同于 success/danger） ---- */
-  --chart-1: light-dark(#5a68e8, #7d8aff);
-  --chart-2: light-dark(#0d9bbf, #4cc9e8);
-  --chart-3: light-dark(#9455d4, #b07ce8);
-  --chart-4: light-dark(#0f9e84, #3ecfae);
-  --chart-5: light-dark(#d98a12, #ffb454);
-  --chart-6: light-dark(#d4508f, #f47fb7);
-  --chart-pos: light-dark(#12a25a, #38d68b);
-  --chart-neg: light-dark(#dd3b30, #ff7a70);
-  --chart-grid: light-dark(rgba(23, 32, 50, 0.07), rgba(148, 166, 200, 0.09));
+  /* ---- 图表色板 ----
+     色相承载业务语义而非随机轮转：收入=绿、订阅=紫、评论=蓝、下载=teal、退款=红。
+     色相在两种主题下**保持不变**（读图记忆才稳定），但明度分两档：
+     参考色板的原值在白底上只有 1.84–2.97:1，达不到 WCAG 对数据图形的 3:1，
+     所以浅色模式用同色相压暗的版本，深色模式用原值。 */
+  --chart-1: light-dark(#576cdb, #576cdb); /* blue   —— 通用 / 评论 */
+  --chart-2: light-dark(#0da767, #11d483); /* green  —— 收入 */
+  --chart-3: light-dark(#a683d0, #a987d1); /* violet —— 订阅 */
+  --chart-4: light-dark(#219fbb, #51c6e0); /* teal   —— 下载 */
+  --chart-5: light-dark(#e07636, #e79462); /* orange */
+  --chart-6: light-dark(#f2545b, #f2545b); /* red    —— 退款 */
+  --chart-7: light-dark(#819d2e, #99bb37); /* froggy —— 评分 4★ */
+  --chart-8: light-dark(#c48814, #edb64b); /* amber  —— 评分 3★（红→绿渐变的中间档） */
+  --chart-pos: light-dark(#0da767, #11d483);
+  --chart-neg: #f2545b;
+  --chart-grid: light-dark(#ebebf0, rgba(150, 150, 180, 0.14));
 
   /* ---- 评分星 ---- */
-  --star: light-dark(#e8a213, #ffcf4d);
+  /* 评分星是图形符号，按 3:1 判定；原 #e8a213 在浅色底仅 2.19:1 */
+  --star: light-dark(#b7800f, #ffcf4d);
 
   /* ============ 排版尺度 ============
      --fs-1 最小 → --fs-10 最大；正文 = --fs-5(15px)
@@ -105,22 +140,27 @@
   --s7: 28px;
   --s8: 32px;
 
-  /* ---- 圆角 ---- */
+  /* ---- 圆角（整体收紧一档：12 → 10，更克制） ---- */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-lg: 16px;
+  --radius-card: 10px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
 
   /* ---- 命中区域下限（触屏 44px） ---- */
   --tap: 44px;
 
-  /* ---- 数据排版：KPI / 金额 / 图表总计用系统 mono 栈（Dashboard-Data 风格，零外部字体） ---- */
+  /* ---- 数据排版 ----
+     金额与 KPI **不用** mono 字体，改用正文字体 + font-variant-numeric: tabular-nums
+     （见 base.css 的全局声明）。等宽字体会让财务数字带上「终端日志」的工程感；
+     比例字体配 tabular figures 同样能对齐列，观感却是财务报表。
+     --font-mono 只保留给真正的代码内容（如 Access Token 展示）。 */
   --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Roboto Mono', 'Consolas', monospace;
 
   /* ---- Tab bar / 顶栏毛玻璃 ---- */
-  --bar-bg: light-dark(rgba(244, 245, 248, 0.86), rgba(11, 14, 20, 0.82));
+  /* 毛玻璃底色必须跟 --bg-app 同源，否则滚动时顶栏与页面底色有色差 */
+  --bar-bg: light-dark(rgba(246, 246, 248, 0.86), rgba(10, 10, 16, 0.82));
 
   /* ---- 内容限宽 ---- */
   --w-main: 720px;

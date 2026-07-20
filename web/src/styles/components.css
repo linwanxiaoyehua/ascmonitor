@@ -38,6 +38,15 @@
   height: var(--tap);
 }
 
+/* ---- 主按钮：整体扁平的系统里唯一的「立体」元素，形成视觉焦点 ---- */
+button.primary {
+  background: linear-gradient(180deg, var(--accent-grad-top), var(--accent-grad-bottom));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 4px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(9, 9, 13, 0.12);
+}
+button.primary:active { background: linear-gradient(180deg, var(--accent-grad-bottom), var(--accent-grad-bottom)); opacity: 1; }
+button.primary:disabled { background: var(--accent); box-shadow: none; }
+
 /* ---- AppShell 布局 ---- */
 .shell-main {
   max-width: var(--w-main);
@@ -74,11 +83,11 @@
   gap: var(--s1-5);
   font-size: var(--fs-5);
   font-weight: var(--fw-bold);
-  color: var(--text-3);
+  color: var(--text-2);
   min-width: 0;
 }
 .topbar-crumb .current { color: var(--text-1); }
-.topbar-crumb .sep { color: var(--text-3); font-weight: var(--fw-medium); margin-right: var(--s1-5); }
+.topbar-crumb .sep { color: var(--text-2); font-weight: var(--fw-medium); margin-right: var(--s1-5); }
 .topbar-inner.solo .topbar-crumb { display: flex; }
 
 .topbar-action {
@@ -119,10 +128,10 @@
 /* 数据新鲜度指示点（实时监控风格：正常态呼吸脉冲） */
 .fresh-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .fresh-dot.ok {
-  background: var(--success);
+  background: var(--success-icon);
   animation: live-pulse 2.4s var(--ease) infinite;
 }
-.fresh-dot.stale { background: var(--warning); }
+.fresh-dot.stale { background: var(--warning-icon); }
 .fresh-dot.dead { background: var(--text-3); }
 @keyframes live-pulse {
   0%, 100% { box-shadow: 0 0 0 0 var(--success-soft); }
@@ -165,16 +174,18 @@
 .section-head .action {
   margin-left: auto;
   background: none; border: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--fs-3); font-weight: var(--fw-medium);
   cursor: pointer;
-  padding: var(--s0-5) var(--s1);
+  /* 命中区补足到 44px：视觉仍是一行文字，不撑开区块头 */
+  padding: var(--s3-5) var(--s2);
+  margin: calc(-1 * var(--s3-5)) calc(-1 * var(--s2));
 }
 
 /* ---- 卡片基底（统一立体感：描边 + 内高光） ---- */
 .panel {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
@@ -191,7 +202,7 @@
 .stat-card {
   position: relative;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: var(--s3) var(--s4);
@@ -215,10 +226,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 /* 口径徽标等收纳到卡片右上角，不再挤压 label 行 */
 .stat-card .stat-badge { position: absolute; top: var(--s3); right: var(--s3); }
 .stat-card .value {
-  font-family: var(--font-mono);
   font-size: var(--fs-9); font-weight: var(--fw-bold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   line-height: 1.3;
   color: var(--text-1);
 }
@@ -249,7 +258,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 /* ---- ListRow / List ---- */
 .list {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   overflow: hidden;
@@ -271,6 +280,16 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   transition: background var(--dur) var(--ease);
 }
 .lrow.pressable { cursor: pointer; }
+/* 整行可点 + trailing 是控件时的覆盖层（见 ui.tsx 的 ListRow）：
+   透明按钮铺满行底承接「点行」，控件靠更高层级承接自己的点击，互不干扰 */
+.lrow.has-control { position: relative; }
+.lrow-hit {
+  position: absolute; inset: 0;
+  background: none; border: none; padding: 0;
+  cursor: pointer;
+}
+.lrow-hit:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 0; }
+.lrow.has-control .lrow-trailing { position: relative; z-index: 1; }
 .lrow.pressable:active { background: var(--bg-raised); }
 /* .list 有 overflow:hidden，外扩焦点环会被裁 —— 行内元素一律用内嵌环 */
 .lrow:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 0; }
@@ -285,7 +304,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lrow .side { text-align: right; flex: none; }
-.lrow .amount { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: var(--fw-semi); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.lrow .amount { font-size: var(--fs-4); font-weight: var(--fw-semi); letter-spacing: -0.01em; }
 .lrow .amount.pos { color: var(--success); }
 .lrow .amount.neg { color: var(--danger); }
 .lrow .time { font-size: var(--fs-2); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; margin-top: 1px; }
@@ -293,7 +312,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .lrow .chevron { color: var(--text-3); flex: none; transition: transform var(--dur) var(--ease); }
 .lrow .chevron.open { transform: rotate(90deg); }
 /* 行右侧文字动作（如「复制」） */
-.lrow .row-action-text { color: var(--accent); font-size: var(--fs-4); flex: none; }
+.lrow .row-action-text { color: var(--accent-text); font-size: var(--fs-4); flex: none; }
 
 /* 行首图标（语义色 soft 底 + 色字） */
 .row-icon {
@@ -304,10 +323,10 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   color: var(--neutral);
 }
 .row-icon.sm { width: 20px; height: 20px; border-radius: var(--radius-sm); }
-.row-icon.tone-success { background: var(--success-soft); color: var(--success); }
-.row-icon.tone-info { background: var(--info-soft); color: var(--info); }
-.row-icon.tone-danger { background: var(--danger-soft); color: var(--danger); }
-.row-icon.tone-warning { background: var(--warning-soft); color: var(--warning); }
+.row-icon.tone-success { background: var(--success-soft); color: var(--success-icon); }
+.row-icon.tone-info { background: var(--info-soft); color: var(--info-icon); }
+.row-icon.tone-danger { background: var(--danger-soft); color: var(--danger-icon); }
+.row-icon.tone-warning { background: var(--warning-soft); color: var(--warning-icon); }
 .row-icon.tone-accent { background: var(--accent-soft); color: var(--accent); }
 
 /* App 图标 */
@@ -333,10 +352,10 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   color: var(--bg-surface);
   border: 2px solid var(--bg-surface);
 }
-.icon-stack .icon-badge.tone-success { background: var(--success); }
-.icon-stack .icon-badge.tone-info { background: var(--info); }
-.icon-stack .icon-badge.tone-danger { background: var(--danger); }
-.icon-stack .icon-badge.tone-warning { background: var(--warning); }
+.icon-stack .icon-badge.tone-success { background: var(--success-icon); }
+.icon-stack .icon-badge.tone-info { background: var(--info-icon); }
+.icon-stack .icon-badge.tone-danger { background: var(--danger-icon); }
+.icon-stack .icon-badge.tone-warning { background: var(--warning-icon); }
 .icon-stack .icon-badge.tone-accent { background: var(--accent); }
 
 /* ---- Timeline（订阅行展开） ---- */
@@ -354,8 +373,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   width: 1px; height: var(--s3);
   background: var(--border-strong);
 }
-.timeline-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--success); }
-.timeline-dot.neg { background: var(--danger); }
+.timeline-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--success-icon); }
+.timeline-dot.neg { background: var(--danger-icon); }
 .timeline-label { color: var(--text-1); }
 .timeline-amount { color: var(--text-2); margin-left: auto; }
 .timeline-time { color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -451,7 +470,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   text-decoration: none;
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
-.tabbar a.active { color: var(--accent); }
+.tabbar a.active { color: var(--accent-text); }
 .tabbar a:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: var(--radius-control); }
 .tabbar-brand { display: none; }
 /* .tab-item 移动端透传布局（a 直接参与 tabbar flex）；二级导航仅桌面显示 */
@@ -461,7 +480,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 /* ---- ChartFrame ---- */
 .chart-frame {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: var(--s4);
@@ -471,23 +490,26 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   margin-bottom: var(--s3);
   flex-wrap: wrap;
 }
-.chart-frame .total { font-family: var(--font-mono); font-size: var(--fs-7); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; white-space: nowrap; }
+.chart-frame .total { font-size: var(--fs-7); font-weight: var(--fw-bold); letter-spacing: -0.02em; white-space: nowrap; }
 .chart-frame .label { font-size: var(--fs-2); color: var(--text-2); white-space: nowrap; }
 .chart-empty { text-align: center; color: var(--text-2); font-size: var(--fs-3); padding: 48px 0; }
 .spark-line { fill: none; stroke: var(--chart-1); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
 .sparkline { width: 100%; display: block; }
 
-/* Recharts 覆盖：tooltip 走 token */
+/* Recharts tooltip：反色实心块（浅色下深底白字），不是带描边的浅色卡片。
+   反色让它从图表平面里「浮」出来，不必靠阴影和描边堆重量。 */
 .chart-tooltip {
-  background: var(--bg-raised);
-  border: 1px solid var(--border-strong);
+  background: var(--text-1);
+  color: var(--bg-surface);
   border-radius: var(--radius-control);
-  padding: var(--s2) var(--s2-5);
-  font-size: var(--fs-2);
+  padding: var(--s2-5) var(--s3);
+  font-size: var(--fs-3);
+  line-height: 1.25rem;
+  opacity: 0.95;
   box-shadow: var(--shadow-pop);
 }
-.chart-tooltip .tt-label { color: var(--text-2); margin-bottom: 3px; }
-.chart-tooltip .tt-row { display: flex; align-items: center; gap: var(--s1-5); font-variant-numeric: tabular-nums; color: var(--text-1); }
+.chart-tooltip .tt-label { opacity: 0.62; margin-bottom: var(--s1); }
+.chart-tooltip .tt-row { display: flex; align-items: center; gap: var(--s1-5); }
 .chart-tooltip .tt-swatch { width: var(--s2); height: var(--s2); border-radius: var(--radius-xs); flex: none; }
 
 /* ---- 口径徽标 ---- */
@@ -507,7 +529,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .review-list { display: flex; flex-direction: column; gap: var(--s3); }
 .review-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: var(--s4);
@@ -537,7 +559,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .review-reply .rr-head .muted { font-size: var(--fs-2); }
 .review-reply .rr-body { font-size: var(--fs-4); color: var(--text-1); line-height: 1.55; white-space: pre-wrap; }
 .review-card .rr-actions { margin-top: var(--s3); }
-.review-card .rr-actions .ghost { min-height: 36px; padding: var(--s1-5) var(--s4); font-size: var(--fs-4); }
+.review-card .rr-actions .ghost { min-height: var(--tap); padding: var(--s2) var(--s4); font-size: var(--fs-4); }
 /* 回复 Sheet 内的评论上下文 */
 .rr-context {
   display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
@@ -563,7 +585,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .state-box .state-title { color: var(--text-1); font-weight: var(--fw-medium); }
 .state-box .muted { margin-top: var(--s1); max-width: 40ch; }
 .state-box.error-state { border-color: var(--danger-line); background: var(--danger-soft); }
-.state-box.error-state svg { color: var(--danger); }
+.state-box.error-state svg { color: var(--danger-icon); }
 
 .skeleton {
   border-radius: var(--radius-card);
@@ -647,8 +669,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   pointer-events: auto;
 }
 .toast svg { flex: none; }
-.toast.error svg { color: var(--danger); }
-.toast.success svg { color: var(--success); }
+.toast.error svg { color: var(--danger-icon); }
+.toast.success svg { color: var(--success-icon); }
 @keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } }
 
 /* ---- 开关 ---- */
@@ -700,11 +722,13 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .dist.seq .dist-row:nth-child(4) .dist-fill { background: var(--chart-4); }
 .dist.seq .dist-row:nth-child(5) .dist-fill { background: var(--chart-5); }
 .dist.seq .dist-row:nth-child(n + 6) .dist-fill { background: var(--chart-6); }
-/* 评分分布：1★ 红 → 5★ 绿 */
+/* 评分分布：1★ 红 → 5★ 绿的连续色相渐变。
+   中间三档必须落在红与绿之间的色相路径上 —— 插入 teal/蓝会截断渐变，
+   让「越绿越好」这个直觉失效。 */
 .dist.rating .dist-row:nth-child(1) .dist-fill { background: var(--chart-neg); }
 .dist.rating .dist-row:nth-child(2) .dist-fill { background: var(--chart-5); }
-.dist.rating .dist-row:nth-child(3) .dist-fill { background: var(--warning); }
-.dist.rating .dist-row:nth-child(4) .dist-fill { background: var(--chart-4); }
+.dist.rating .dist-row:nth-child(3) .dist-fill { background: var(--chart-8); }
+.dist.rating .dist-row:nth-child(4) .dist-fill { background: var(--chart-7); }
 .dist.rating .dist-row:nth-child(5) .dist-fill { background: var(--chart-pos); }
 
 /* ---- 三级分组头（列表内分组：明细状态组 / 动态按天分组） ---- */
@@ -719,10 +743,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 /* 动态页：当日收入合计，靠右对齐在日期同一行 */
 .group-label .day-total {
   margin-left: auto;
-  font-family: var(--font-mono);
   font-size: var(--fs-2);
   font-weight: var(--fw-semi);
-  letter-spacing: -0.02em;
   color: var(--success);
 }
 .group-label .day-total.neg { color: var(--danger); }
@@ -759,14 +781,14 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .alert-card .ac-body { flex: 1; min-width: 0; }
 .alert-card .ac-title { font-size: var(--fs-3); font-weight: var(--fw-semi); color: var(--danger); display: flex; align-items: center; gap: var(--s1-5); }
 .alert-card .ac-text { font-size: var(--fs-3); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: var(--s0-5); }
-.alert-card > svg { color: var(--danger); flex: none; }
+.alert-card > svg { color: var(--danger-icon); flex: none; }
 
 /* ---- 多 App 分列概览 ---- */
 .app-ov-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); }
 .app-ov-row .ao-name { flex: 1; min-width: 0; font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-ov-metrics { display: flex; gap: var(--s5); flex: none; }
 .app-ov-metric { text-align: right; }
-.app-ov-metric .v { display: block; font-family: var(--font-mono); font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.app-ov-metric .v { display: block; font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--text-1); }
 .app-ov-metric .k { font-size: var(--fs-1); color: var(--text-2); }
 @media (max-width: 400px) { .app-ov-metrics { gap: var(--s3); } .app-ov-metric.opt { display: none; } }
 
@@ -779,6 +801,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 /* ============ hover：按输入能力而非屏宽 ============ */
 @media (hover: hover) and (pointer: fine) {
   .lrow.pressable:hover { background: var(--bg-raised); }
+  .lrow.has-control:has(.lrow-hit:hover) { background: var(--bg-raised); }
   .chip:hover { border-color: var(--border-strong); color: var(--text-1); }
   .chip.active:hover { border-color: var(--accent); color: var(--accent); }
   button.stat-card:hover { background: var(--bg-raised); }
@@ -848,7 +871,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
     color: var(--text-2);
   }
   .tabbar a svg { width: 18px; height: 18px; }
-  .tabbar a.active { background: var(--accent-soft); color: var(--accent); }
+  .tabbar a.active { background: var(--accent-soft); color: var(--accent-text); }
   .tabbar .tab-item { display: block; width: 100%; }
 
   /* 二级导航 rail：缩进导轨线 + accent 指示条 */
@@ -879,7 +902,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
     display: block;
   }
   .subnav-rail a.active {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: var(--fw-semi);
     background: none;
   }

@@ -12,6 +12,9 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* 全局等宽数字：金额、计数、时间戳天然对齐，且数字变化时不会左右跳动。
+     全局施加而非逐个组件加 —— 数字在这个产品里到处都是。 */
+  font-variant-numeric: tabular-nums;
 }
 
 #root { min-height: 100dvh; }
@@ -29,7 +32,7 @@ body {
 .pos { color: var(--success); }
 .neg { color: var(--danger); }
 
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--accent-text); text-decoration: none; }
 
 /* ---- 表单 ---- */
 input, textarea, select {
@@ -77,7 +80,7 @@ button.primary, button.ghost {
   transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 button.primary { background: var(--accent); color: var(--on-accent); }
-button.ghost { background: var(--bg-surface); color: var(--accent); border: 1px solid var(--border-subtle); }
+button.ghost { background: var(--bg-surface); color: var(--accent-text); border: 1px solid var(--border-subtle); }
 button.primary:active { opacity: 0.8; }
 button.ghost:active { background: var(--bg-raised); }
 button:disabled { opacity: 0.4; cursor: default; }
@@ -115,7 +118,7 @@ input:focus-visible, textarea:focus-visible {
 .mb-3 { margin-bottom: var(--s3); }
 .mb-4 { margin-bottom: var(--s4); }
 .mb-5 { margin-bottom: var(--s5); }
-.accent-text { color: var(--accent); }
+.accent-text { color: var(--accent-text); }
 .star-text { color: var(--star); }
 /* 列表/表单下方的提示行（配 .muted） */
 .hint { margin: var(--s2) var(--s0-5) 0; }

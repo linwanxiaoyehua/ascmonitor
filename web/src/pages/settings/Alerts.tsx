@@ -207,6 +207,7 @@ function AlertRulesSection() {
                 title={m.label}
                 detail={describeRule(r)}
                 trailing={<Switch checked={!!r.enabled} onChange={() => toggleMutation.mutate(r)} label={`${m.label}开关`} />}
+                trailingIsControl
                 onPress={() => openEdit(r)}
               />
             )

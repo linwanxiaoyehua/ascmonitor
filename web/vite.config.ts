@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'ASCMonitor',
         short_name: 'ASCMonitor',
         description: 'App Store 收入 · 订阅 · 评论监控',
-        theme_color: '#0b0e14',
-        background_color: '#0b0e14',
+        theme_color: '#0a0a10',
+        background_color: '#0a0a10',
         display: 'standalone',
         start_url: '/',
         icons: [

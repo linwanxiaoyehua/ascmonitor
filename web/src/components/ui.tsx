@@ -90,7 +90,7 @@ export function StatCard({
 /* ---------- ListRow ---------- */
 
 export function ListRow({
-  leading, title, badges, detail, amount, time, trailing, chevronOpen, onPress,
+  leading, title, badges, detail, amount, time, trailing, trailingIsControl, chevronOpen, onPress,
 }: {
   leading?: ReactNode
   title: ReactNode
@@ -99,6 +99,8 @@ export function ListRow({
   amount?: { milli: number | null | undefined; currency: string | null | undefined; sign?: 'pos' | 'neg' }
   time?: number
   trailing?: 'chevron' | ReactNode
+  /** trailing 是可交互控件（开关、按钮）时必须置位：见下方覆盖层说明 */
+  trailingIsControl?: boolean
   chevronOpen?: boolean
   onPress?: () => void
 }) {
@@ -125,11 +127,28 @@ export function ListRow({
       ) : null}
       {trailing === 'chevron' ? (
         <Icon name="chevronRight" size={16} className={`chevron${chevronOpen ? ' open' : ''}`} />
-      ) : (
-        trailing
-      )}
+      ) : trailing ? (
+        <span className="lrow-trailing">{trailing}</span>
+      ) : null}
     </>
   )
+
+  // 整行可点 + trailing 是控件：不能把控件套进 <button> —— 嵌套 button 是无效 HTML，
+  // 且点开关会连带触发整行的 onPress。改用覆盖层：透明按钮铺满行底，控件浮在其上。
+  if (onPress && trailingIsControl) {
+    return (
+      <div className="lrow has-control">
+        <button
+          className="lrow-hit"
+          onClick={onPress}
+          aria-label={typeof title === 'string' ? title : undefined}
+          aria-expanded={chevronOpen}
+        />
+        {body}
+      </div>
+    )
+  }
+
   return onPress ? (
     <button className="lrow pressable" onClick={onPress} aria-expanded={chevronOpen}>{body}</button>
   ) : (

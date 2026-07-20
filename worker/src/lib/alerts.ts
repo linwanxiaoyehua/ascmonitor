@@ -16,14 +16,23 @@ export interface AlertRule {
   last_fired_at: number | null
 }
 
-async function fire(db: D1Database, rule: AlertRule, title: string, body: string): Promise<void> {
+/** 告警归属 App 的图标：推送里显示成该 App 自己的图标，多 App 时一眼认出是谁出了问题 */
+async function appIconOf(db: D1Database, appId: number | null): Promise<string | null> {
+  if (!appId) return null // 跨 App 告警用默认 ASCMonitor 图标
+  const app = await db.prepare('SELECT icon_url FROM apps WHERE id = ?').bind(appId).first<{ icon_url: string | null }>()
+  return app?.icon_url ?? null
+}
+
+async function fire(db: D1Database, rule: AlertRule, title: string, body: string, appId?: number | null): Promise<void> {
   const now = Date.now()
   if (rule.last_fired_at && now - rule.last_fired_at < rule.silence_min * 60_000) return // 静默期内
   await db.prepare('UPDATE alert_rules SET last_fired_at = ? WHERE id = ?').bind(now, rule.id).run()
 
   // channels_json 生效：事件始终记录，Web Push 仅在 "push" 在列表时发送
   const channels: string[] = JSON.parse(rule.channels_json)
-  await notify(db, rule.kind, title, body, { ruleId: rule.id, push: channels.includes('push') })
+  const ownerId = appId ?? rule.app_id
+  const icon = await appIconOf(db, ownerId)
+  await notify(db, rule.kind, title, body, { ruleId: rule.id, appId: ownerId, push: channels.includes('push'), icon })
 
   // Telegram 可选渠道
   if (channels.includes('telegram')) {
@@ -55,11 +64,13 @@ export async function evaluateNewReview(
     if (review.rating > (params.max_rating ?? 2)) continue
     const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)
     const where = countryDisplay(review.country)
+    // 用评论自身的 app_id 而非 rule.app_id：规则可以不绑 App，但差评永远属于某个具体 App
     await fire(
       db,
       rule,
       `😞 新差评 ${stars}`,
-      `${where ? `${where} · ` : ''}${review.title}\n${review.body.slice(0, 200)}`
+      `${where ? `${where} · ` : ''}${review.title}\n${review.body.slice(0, 200)}`,
+      review.app_id
     )
   }
 }

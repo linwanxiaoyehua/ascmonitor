@@ -292,3 +292,124 @@ export async function postReviewResponse(creds: AscCredentials, reviewId: string
   const json = (await res.json()) as { data?: { attributes?: { state?: string } } }
   return json.data?.attributes?.state ?? 'PENDING_PUBLISH'
 }
+
+/* ---------- Webhook 注册 ---------- */
+
+/** 我们订阅的三类事件：构建上传、外部 TestFlight（含 Beta 审核流转）、上架审核 */
+export const ASC_WEBHOOK_EVENTS = [
+  'BUILD_UPLOAD_STATE_UPDATED',
+  'BUILD_BETA_DETAIL_EXTERNAL_BUILD_STATE_UPDATED',
+  'APP_STORE_VERSION_APP_VERSION_STATE_UPDATED',
+]
+
+/** 一个 webhook 只能绑一个 App，多 App 需各自注册（每 App 上限 10 个） */
+export async function createWebhook(
+  creds: AscCredentials,
+  ascAppId: string,
+  url: string,
+  secret: string,
+  name = 'ASCMonitor'
+): Promise<string> {
+  const res = await fetch('https://api.appstoreconnect.apple.com/v1/webhooks', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await ascJwt(creds)}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: {
+        type: 'webhooks',
+        attributes: { enabled: true, eventTypes: ASC_WEBHOOK_EVENTS, name, secret, url },
+        relationships: { app: { data: { type: 'apps', id: ascAppId } } },
+      },
+    }),
+  })
+  if (!res.ok) throw new Error(`create webhook ${res.status}: ${await res.text()}`)
+  const json = (await res.json()) as { data?: { id?: string } }
+  if (!json.data?.id) throw new Error('create webhook: 响应缺少 id')
+  return json.data.id
+}
+
+export async function deleteWebhook(creds: AscCredentials, webhookId: string): Promise<void> {
+  const res = await fetch(`https://api.appstoreconnect.apple.com/v1/webhooks/${webhookId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${await ascJwt(creds)}` },
+  })
+  // 404 = 已经不在了，视作成功
+  if (!res.ok && res.status !== 404) throw new Error(`delete webhook ${res.status}: ${await res.text()}`)
+}
+
+/* ---------- 构建 / 审核状态（webhook 的对账兜底，每 App 2 个子请求）---------- */
+
+export interface AscBuildStatus {
+  buildId: string
+  /** builds.attributes.version 实际是构建号（42），不是 1.2.3 */
+  buildNumber: string | null
+  processingState: string | null
+  externalBuildState: string | null
+}
+
+export interface AscVersionStatus {
+  versionId: string
+  versionString: string | null
+  appVersionState: string | null
+}
+
+/**
+ * 最新一个构建的处理状态 + 外部 TestFlight 状态。
+ * include=buildBetaDetail 把两者一次取回 —— 分开查会翻倍子请求，
+ * Beta 审核流转（WAITING_FOR_BETA_REVIEW → IN_BETA_REVIEW → BETA_APPROVED/REJECTED）
+ * 已体现在 externalBuildState 里，无需再 include betaAppReviewSubmission。
+ */
+export async function fetchBuildStatus(creds: AscCredentials, ascAppId: string): Promise<AscBuildStatus | null> {
+  const params = new URLSearchParams({
+    'filter[app]': ascAppId,
+    sort: '-uploadedDate',
+    limit: '1',
+    include: 'buildBetaDetail',
+    'fields[builds]': 'version,uploadedDate,processingState',
+    'fields[buildBetaDetails]': 'internalBuildState,externalBuildState',
+  })
+  const res = await fetch(`https://api.appstoreconnect.apple.com/v1/builds?${params}`, {
+    headers: { Authorization: `Bearer ${await ascJwt(creds)}` },
+  })
+  if (!res.ok) return null
+  const json = (await res.json()) as {
+    data?: Array<{ id: string; attributes?: { version?: string; processingState?: string } }>
+    included?: Array<{ type: string; attributes?: { externalBuildState?: string } }>
+  }
+  const build = json.data?.[0]
+  if (!build) return null
+  const detail = json.included?.find((i) => i.type === 'buildBetaDetails')
+  return {
+    buildId: build.id,
+    buildNumber: build.attributes?.version ?? null,
+    processingState: build.attributes?.processingState ?? null,
+    externalBuildState: detail?.attributes?.externalBuildState ?? null,
+  }
+}
+
+/**
+ * 当前在办版本的上架审核状态（appVersionState；旧的 appStoreState 已弃用）。
+ * appStoreVersions 的返回顺序未定义，所以取几条后跳过已被取代的版本，而不是盲取第一条。
+ */
+export async function fetchVersionStatus(creds: AscCredentials, ascAppId: string): Promise<AscVersionStatus | null> {
+  const params = new URLSearchParams({
+    limit: '5',
+    'fields[appStoreVersions]': 'versionString,appVersionState,createdDate',
+  })
+  const res = await fetch(
+    `https://api.appstoreconnect.apple.com/v1/apps/${ascAppId}/appStoreVersions?${params}`,
+    { headers: { Authorization: `Bearer ${await ascJwt(creds)}` } }
+  )
+  if (!res.ok) return null
+  const json = (await res.json()) as {
+    data?: Array<{ id: string; attributes?: { versionString?: string; appVersionState?: string; createdDate?: string } }>
+  }
+  const versions = json.data ?? []
+  const current =
+    versions.find((v) => v.attributes?.appVersionState !== 'REPLACED_WITH_NEW_VERSION') ?? versions[0]
+  if (!current) return null
+  return {
+    versionId: current.id,
+    versionString: current.attributes?.versionString ?? null,
+    appVersionState: current.attributes?.appVersionState ?? null,
+  }
+}

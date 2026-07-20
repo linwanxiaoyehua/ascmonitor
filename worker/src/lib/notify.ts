@@ -7,11 +7,13 @@ export async function notify(
   kind: string,
   title: string,
   body: string,
-  opts?: { ruleId?: number; icon?: string | null; push?: boolean }
+  opts?: { ruleId?: number; appId?: number | null; icon?: string | null; push?: boolean; tone?: string }
 ): Promise<void> {
   const event = await db
-    .prepare('INSERT INTO alert_events (rule_id, kind, title, body) VALUES (?, ?, ?, ?) RETURNING id')
-    .bind(opts?.ruleId ?? null, kind, title, body)
+    .prepare(
+      'INSERT INTO alert_events (rule_id, app_id, kind, title, body, tone) VALUES (?, ?, ?, ?, ?, ?) RETURNING id'
+    )
+    .bind(opts?.ruleId ?? null, opts?.appId ?? null, kind, title, body, opts?.tone ?? null)
     .first<{ id: number }>()
 
   // 规则渠道未含 "push" 时只记录事件不推送（channels_json 真正生效）

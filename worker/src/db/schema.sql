@@ -147,13 +147,34 @@ CREATE TABLE IF NOT EXISTS alert_rules (
 CREATE TABLE IF NOT EXISTS alert_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   rule_id INTEGER,
+  app_id INTEGER,                -- 归属 App（跨 App 告警为 NULL），动态流按 App 筛选用
   kind TEXT NOT NULL,
   title TEXT NOT NULL,
   body TEXT,
+  tone TEXT,                     -- 语义色（success/info/warning/danger/neutral），前端直接用，不再自建映射
   fired_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
   delivered INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_alert_events_time ON alert_events(fired_at);
+CREATE INDEX IF NOT EXISTS idx_alert_events_app ON alert_events(app_id, fired_at);
+
+-- 构建与版本的「当前状态」快照（ASC Webhook 推送 + 每日对账兜底共同维护）。
+-- 只存最新态，用于变化检测去重；状态流转历史进 alert_events，与告警共用动态流。
+CREATE TABLE IF NOT EXISTS build_states (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  -- build      = 构建处理状态（processingState）
+  -- testflight = 外部测试状态（externalBuildState，含 Beta 审核流转）
+  -- appstore   = 上架审核状态（appVersionState）
+  scope TEXT NOT NULL,
+  entity_id TEXT NOT NULL,       -- ASC 资源 id（build id / appStoreVersion id）
+  version TEXT,                  -- 版本号 1.2.3
+  build_number TEXT,             -- 构建号 42
+  state TEXT NOT NULL,           -- 枚举原值，如 VALID / BETA_APPROVED / IN_REVIEW
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  UNIQUE(scope, entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_build_states_app ON build_states(app_id, updated_at);
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint TEXT PRIMARY KEY,

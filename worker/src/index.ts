@@ -8,6 +8,7 @@ import { snapshotRatingsJob } from './jobs/snapshot-ratings'
 import { fetchSalesJob } from './jobs/fetch-sales'
 import { fetchProductsJob } from './jobs/fetch-products'
 import { rollupCohortsJob } from './jobs/rollup-cohorts'
+import { syncBuildStatusJob } from './jobs/sync-build-status'
 import { rollupDaily, updateFxRates, utcDateString } from './lib/metrics'
 import { evaluateFrequent, evaluateDaily } from './lib/alerts'
 import { sendDailyDigest } from './lib/digest'
@@ -62,6 +63,8 @@ export default {
             await cleanupRawPayloads(env.DB)
             budget.spend(8)
             // 抓取项：超预算自动断点，明日 cron 续跑（幂等 / done-set / 游标）
+            // 构建状态对账排在抓取项最前：它是 webhook 漏投的兜底，比目录/快照更怕拖延
+            if (!budget.exhausted) await syncBuildStatusJob(env.DB, budget)
             if (!budget.exhausted) await fetchProductsJob(env.DB, budget)
             if (!budget.exhausted) await snapshotRatingsJob(env.DB, budget)
             if (!budget.exhausted) await fetchSalesJob(env.DB, budget)

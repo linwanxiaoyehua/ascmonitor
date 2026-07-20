@@ -2,6 +2,7 @@
 //   /settings          主页面：偏好 + 分组导航 + 关于
 //   /settings/connect  接入与凭证    /settings/apps  App 管理
 //   /settings/alerts   通知与告警    /settings/data  数据运维
+//   /settings/builds   构建监控
 // 二级页清单来自 lib/nav 的 SETTINGS_SUBS —— 与桌面侧边栏共用同一份定义
 // 告警 tab 已解散：规则配置归此处，历史归动态页
 
@@ -14,6 +15,7 @@ import { ListRow, PageHeader, Section, SegmentedControl } from '../../components
 import { ConnectSection } from './Connect'
 import { AppsSection } from './Apps'
 import { AlertsSection } from './Alerts'
+import { BuildsSection } from './Builds'
 import { DataSection } from './Data'
 
 const THEME_OPTIONS: Array<{ value: Theme; label: string }> = [
@@ -81,6 +83,8 @@ export function SettingsPage() {
       return <AppsSection />
     case 'alerts':
       return <AlertsSection />
+    case 'builds':
+      return <BuildsSection />
     case 'data':
       return <DataSection />
     default:

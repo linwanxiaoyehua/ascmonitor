@@ -8,7 +8,8 @@ import { reprocessJob } from '../jobs/reprocess'
 import { fetchProductsJob } from '../jobs/fetch-products'
 import { rollupCohortsJob } from '../jobs/rollup-cohorts'
 import { revenueBreakdown, subHealth, trialCohorts } from '../lib/insights'
-import { loadAscCredentials, postReviewResponse } from '../lib/asc-api'
+import { createWebhook, deleteWebhook, loadAscCredentials, postReviewResponse } from '../lib/asc-api'
+import { describeState, type BuildScope } from '../lib/build-status'
 import { enrichApp, type AppLite } from '../lib/app-enrich'
 
 export const api = new Hono<{ Bindings: Env }>()
@@ -140,7 +141,8 @@ api.get('/activity', async (c) => {
   const kinds = (c.req.query('kinds') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   const wantAll = kinds.length === 0
   const wantAlerts = wantAll || kinds.includes('alert')
-  const eventKinds = kinds.filter((k) => k !== 'alert')
+  const wantBuild = wantAll || kinds.includes('build')
+  const eventKinds = kinds.filter((k) => k !== 'alert' && k !== 'build')
   const wantEvents = wantAll || eventKinds.length > 0
 
   type Item = Record<string, unknown> & { ts: number }
@@ -198,16 +200,33 @@ api.get('/activity', async (c) => {
     )
   }
 
-  if (wantAlerts) {
+  if (wantAlerts || wantBuild) {
     // 排除 kind='transaction'：那是交易事件的实时推送记录，事件本体已在 raw 流中（否则同一笔交易显示两次）
+    const alertConds = ['e.fired_at < ?', "e.kind != 'transaction'"]
+    const alertBinds: unknown[] = [before]
+    // 构建状态事件（build_*）与告警同住 alert_events，靠 kind 前缀分流到两个筛选项
+    if (wantBuild && !wantAlerts) alertConds.push("e.kind LIKE 'build\\_%' ESCAPE '\\'")
+    else if (wantAlerts && !wantBuild) alertConds.push("e.kind NOT LIKE 'build\\_%' ESCAPE '\\'")
+    // 全局告警（app_id 为 NULL，如跨 App 的 webhook 静默）在任何 App 视图下都该可见
+    if (appId) { alertConds.push('(e.app_id = ? OR e.app_id IS NULL)'); alertBinds.push(Number(appId)) }
+    alertBinds.push(limit)
     queries.push(
-      c.env.DB.prepare("SELECT id, kind, title, body, fired_at FROM alert_events WHERE fired_at < ? AND kind != 'transaction' ORDER BY fired_at DESC LIMIT ?")
-        .bind(before, limit)
-        .all<{ id: number; kind: string; title: string; body: string | null; fired_at: number }>()
+      c.env.DB.prepare(
+        `SELECT e.id, e.kind, e.title, e.body, e.tone, e.fired_at, e.app_id,
+                a.name AS app_name, a.icon_url AS app_icon
+         FROM alert_events e LEFT JOIN apps a ON a.id = e.app_id
+         WHERE ${alertConds.join(' AND ')} ORDER BY e.fired_at DESC LIMIT ?`
+      )
+        .bind(...alertBinds)
+        .all<{
+          id: number; kind: string; title: string; body: string | null; tone: string | null; fired_at: number
+          app_id: number | null; app_name: string | null; app_icon: string | null
+        }>()
         .then((rows) =>
           rows.results.map((r) => ({
             kind: 'alert', id: `alert:${r.id}`, ts: r.fired_at,
-            alertKind: r.kind, title: r.title, body: r.body,
+            alertKind: r.kind, title: r.title, body: r.body, tone: r.tone,
+            appId: r.app_id, appName: r.app_name, appIcon: r.app_icon,
           }))
         )
     )
@@ -563,6 +582,112 @@ api.put('/config/:key', async (c) => {
   await c.env.DB.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .bind(key, value)
     .run()
+  return c.json({ ok: true })
+})
+
+/* ---------- 构建 / 审核状态 ---------- */
+
+// 各 App 的当前构建与审核状态（设置页与总览展示用）
+api.get('/build-status', async (c) => {
+  const appId = c.req.query('app_id')
+  const conds = appId ? 'WHERE b.app_id = ?' : ''
+  const stmt = c.env.DB.prepare(
+    `SELECT b.app_id, b.scope, b.entity_id, b.version, b.build_number, b.state, b.updated_at,
+            a.name AS app_name, a.icon_url AS app_icon
+     FROM build_states b LEFT JOIN apps a ON a.id = b.app_id
+     ${conds} ORDER BY b.updated_at DESC`
+  )
+  const rows = await (appId ? stmt.bind(Number(appId)) : stmt).all<{
+    app_id: number; scope: BuildScope; entity_id: string; version: string | null
+    build_number: string | null; state: string; updated_at: number
+    app_name: string | null; app_icon: string | null
+  }>()
+  // 附上中文文案与语义色：状态枚举的解释只在 lib/build-status 一处，前端不再维护第二份
+  return c.json(
+    rows.results.map((r) => {
+      const meta = describeState(r.scope, r.state)
+      return { ...r, label: meta.label, tone: meta.tone, major: !!meta.major }
+    })
+  )
+})
+
+// Webhook 注册状态（不返回 secret）
+api.get('/webhooks', async (c) => {
+  const apps = await c.env.DB.prepare('SELECT id, name, asc_app_id FROM apps ORDER BY id').all<{
+    id: number; name: string; asc_app_id: string | null
+  }>()
+  const cfg = await c.env.DB.prepare("SELECT key, value FROM config WHERE key LIKE 'asc\\_webhook\\_%' ESCAPE '\\'").all<{
+    key: string; value: string
+  }>()
+  const byApp = new Map<number, { id?: string; url?: string; createdAt?: number }>()
+  for (const row of cfg.results) {
+    const appId = Number(row.key.replace('asc_webhook_', ''))
+    try { byApp.set(appId, JSON.parse(row.value)) } catch { /* 损坏的配置视作未注册 */ }
+  }
+  return c.json(
+    apps.results.map((a) => {
+      const hook = byApp.get(a.id)
+      return {
+        appId: a.id,
+        name: a.name,
+        ascAppId: a.asc_app_id,
+        registered: !!hook?.id,
+        url: hook?.url ?? null,
+        createdAt: hook?.createdAt ?? null,
+      }
+    })
+  )
+})
+
+// 注册 webhook：生成 secret → 调 ASC 创建 → 存 config。重复注册先清掉旧的，避免 Apple 侧堆积
+api.post('/webhooks/:appId', async (c) => {
+  const appId = Number(c.req.param('appId'))
+  if (!Number.isInteger(appId) || appId <= 0) return c.json({ error: 'bad_app_id' }, 400)
+
+  const app = await c.env.DB.prepare('SELECT asc_app_id FROM apps WHERE id = ?')
+    .bind(appId)
+    .first<{ asc_app_id: string | null }>()
+  if (!app?.asc_app_id) return c.json({ error: 'missing_asc_app_id' }, 400)
+
+  const creds = await loadAscCredentials(c.env.DB)
+  if (!creds) return c.json({ error: 'missing_asc_credentials' }, 400)
+
+  const key = `asc_webhook_${appId}`
+  const existing = await c.env.DB.prepare('SELECT value FROM config WHERE key = ?').bind(key).first<{ value: string }>()
+  if (existing) {
+    try {
+      const old = JSON.parse(existing.value)
+      if (old.id) await deleteWebhook(creds, old.id)
+    } catch { /* 旧配置读不出来就直接覆盖 */ }
+  }
+
+  const secret = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('')
+  const url = `${new URL(c.req.url).origin}/webhook/asc/${appId}`
+  try {
+    const id = await createWebhook(creds, app.asc_app_id, url, secret)
+    await c.env.DB.prepare(
+      'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    )
+      .bind(key, JSON.stringify({ id, secret, url, createdAt: Date.now() }))
+      .run()
+    return c.json({ ok: true, url })
+  } catch (err) {
+    return c.json({ error: 'asc_create_failed', message: String(err) }, 502)
+  }
+})
+
+api.delete('/webhooks/:appId', async (c) => {
+  const appId = Number(c.req.param('appId'))
+  const key = `asc_webhook_${appId}`
+  const row = await c.env.DB.prepare('SELECT value FROM config WHERE key = ?').bind(key).first<{ value: string }>()
+  if (row) {
+    const creds = await loadAscCredentials(c.env.DB)
+    try {
+      const hook = JSON.parse(row.value)
+      if (creds && hook.id) await deleteWebhook(creds, hook.id)
+    } catch { /* Apple 侧删不掉也要清本地，否则永远无法重新注册 */ }
+    await c.env.DB.prepare('DELETE FROM config WHERE key = ?').bind(key).run()
+  }
   return c.json({ ok: true })
 })
 

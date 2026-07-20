@@ -36,16 +36,52 @@ const ALERT_META: Record<string, { icon: IconName; tone: Tone }> = {
   webhook_silent: { icon: 'moon', tone: 'info' },
 }
 
+// 构建 / 审核状态事件（kind = build_*）。状态语义（文案与颜色）由后端给出，
+// 这里只决定用哪个图标 —— 避免前后端各维护一份状态枚举映射
+const BUILD_ICONS: Record<string, IconName> = {
+  build_upload: 'send',
+  build_build: 'layers',
+  build_testflight: 'flask',
+  build_appstore: 'star',
+}
+
+const BUILD_BADGES: Record<string, string> = {
+  build_upload: '上传',
+  build_build: '构建',
+  build_testflight: 'TestFlight',
+  build_appstore: '审核',
+}
+
 export function ActivityRow({ item }: { item: ActivityItem }) {
   if (item.kind === 'alert') {
-    const meta = ALERT_META[item.alertKind] ?? { icon: 'bell' as IconName, tone: 'danger' as Tone }
+    const buildIcon = BUILD_ICONS[item.alertKind]
+    // 构建事件：用后端给的 tone，配 App 图标；普通告警沿用固定的规则配色
+    const meta = buildIcon
+      ? { icon: buildIcon, tone: (item.tone ?? 'info') as Tone }
+      : ALERT_META[item.alertKind] ?? { icon: 'bell' as IconName, tone: 'danger' as Tone }
+    const badgeLabel = BUILD_BADGES[item.alertKind]
     return (
       <ListRow
         leading={
-          <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={16} /></span>
+          buildIcon && item.appIcon ? (
+            <div className="icon-stack">
+              <AppIcon url={item.appIcon} name={item.appName} size={32} />
+              <span className={`icon-badge tone-${meta.tone}`}>
+                <Icon name={meta.icon} size={10} />
+              </span>
+            </div>
+          ) : (
+            <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={16} /></span>
+          )
         }
         title={item.title}
-        badges={<Badge tone="danger">告警</Badge>}
+        badges={
+          badgeLabel ? (
+            <Badge tone={meta.tone === 'accent' ? 'info' : meta.tone}>{badgeLabel}</Badge>
+          ) : (
+            <Badge tone="danger">告警</Badge>
+          )
+        }
         detail={item.body?.split('\n')[0]}
         time={item.ts}
       />

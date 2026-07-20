@@ -196,10 +196,43 @@ export type ActivityItem =
       kind: 'alert'
       id: string
       ts: number
+      /** 告警规则 kind，或构建状态事件的 build_upload / build_build / build_testflight / build_appstore */
       alertKind: string
       title: string
       body: string | null
+      /** 语义色，由后端给出（构建状态的通过/被拒不能同色） */
+      tone: string | null
+      appId: number | null
+      appName: string | null
+      appIcon: string | null
     }
+
+/** 构建 / 审核的当前状态（/api/build-status）。
+    label / tone / major 由后端 lib/build-status 算出，前端不重复维护状态枚举映射 */
+export interface BuildStatus {
+  app_id: number
+  scope: 'upload' | 'build' | 'testflight' | 'appstore'
+  entity_id: string
+  version: string | null
+  build_number: string | null
+  state: string
+  updated_at: number
+  app_name: string | null
+  app_icon: string | null
+  label: string
+  tone: 'success' | 'info' | 'warning' | 'danger' | 'neutral'
+  major: boolean
+}
+
+/** ASC Webhook 注册状态（/api/webhooks） */
+export interface WebhookConfig {
+  appId: number
+  name: string
+  ascAppId: string | null
+  registered: boolean
+  url: string | null
+  createdAt: number | null
+}
 
 export interface SalesDaily {
   date: string

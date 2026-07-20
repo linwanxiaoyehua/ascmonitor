@@ -16,6 +16,7 @@ const KIND_FILTERS = [
   { key: 'sub_change', label: '订阅变化' },
   { key: 'refund', label: '退款' },
   { key: 'alert', label: '告警' },
+  { key: 'build', label: '构建' },
   { key: 'system', label: '系统' },
 ]
 

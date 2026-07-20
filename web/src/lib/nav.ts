@@ -36,6 +36,7 @@ export const SETTINGS_SUBS: NavChild[] = [
   { path: '/settings/connect', label: '接入与凭证', detail: 'Webhook URL · ASC API 凭证', icon: 'key', tone: 'accent' },
   { path: '/settings/apps', label: 'App 管理', detail: 'App 列表 · Apple ID', icon: 'layers', tone: 'info' },
   { path: '/settings/alerts', label: '通知与告警', detail: '推送 · Telegram · 告警规则 · 日报', icon: 'bell', tone: 'danger' },
+  { path: '/settings/builds', label: '构建监控', detail: '构建处理 · TestFlight · 上架审核状态', icon: 'flask', tone: 'warning' },
   { path: '/settings/data', label: '数据运维', detail: '手动抓取评论 / 账单', icon: 'wrench', tone: 'success' },
 ]
 

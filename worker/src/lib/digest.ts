@@ -53,6 +53,10 @@ export async function sendDailyDigest(db: D1Database, yesterdayDate: string): Pr
 
   if (r?.n) lines.push(`💬 新评论 ${r.n} 条，均分 ${(r.avg ?? 0).toFixed(1)} ★`)
 
+  // 只监控一个 App 时日报就是这个 App 的日报，用它的图标；多 App 是跨 App 汇总，保持默认图标
+  const apps = await db.prepare('SELECT icon_url FROM apps LIMIT 2').all<{ icon_url: string | null }>()
+  const icon = apps.results.length === 1 ? apps.results[0].icon_url : null
+
   const [, mo, d] = yesterdayDate.split('-')
-  await notify(db, 'daily_digest', `📊 昨日日报 · ${Number(mo)}月${Number(d)}日`, lines.join('\n'))
+  await notify(db, 'daily_digest', `📊 昨日日报 · ${Number(mo)}月${Number(d)}日`, lines.join('\n'), { icon })
 }

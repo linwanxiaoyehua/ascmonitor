@@ -45,14 +45,41 @@ export function countryDisplay(code?: string | null): string {
   return flag ? `${flag} ${name}` : name
 }
 
-/** 毫单位金额 + 币种 → "¥68.00" / "US$9.99" */
-export function money(milli?: number | null, currency?: string | null): string {
-  if (milli == null || !currency) return ''
-  try {
-    return new Intl.NumberFormat('zh-CN', { style: 'currency', currency }).format(milli / 1000)
-  } catch {
-    return `${(milli / 1000).toFixed(2)} ${currency}`
-  }
+/** App 名可读（非 bundleId 占位）就用名字，否则退回 bundleId 末段 */
+export function appLabelOf(name?: string | null, bundleId?: string | null): string {
+  return name && name !== bundleId ? name : bundleId?.split('.').pop() ?? ''
+}
+
+/** 与今天相差的自然日数（本地时区） */
+function dayDiff(ts: number): number {
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  return Math.round((startOfDay(new Date()) - startOfDay(new Date(ts))) / 86400_000)
+}
+
+/** 相对时间："刚刚" / "3 小时前" / "昨天 14:30" / "7月2日" */
+export function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
+
+  const d = new Date(ts)
+  const days = dayDiff(ts)
+  const hm = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  if (days === 1) return `昨天 ${hm}`
+  if (days <= 7) return `${days} 天前`
+  const md = `${d.getMonth() + 1}月${d.getDate()}日`
+  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}年${md}`
+}
+
+/** 按天分组标签："今天" / "昨天" / "7月2日" */
+export function dayLabel(ts: number): string {
+  const days = dayDiff(ts)
+  if (days === 0) return '今天'
+  if (days === 1) return '昨天'
+  const d = new Date(ts)
+  const md = `${d.getMonth() + 1}月${d.getDate()}日`
+  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}年${md}`
 }
 
 /** 产品 ID 去掉 bundleId 前缀，只留人能认出的部分 */

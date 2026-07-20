@@ -54,22 +54,6 @@ export interface AppRow {
   icon_url: string | null
 }
 
-export interface EventRow {
-  uuid: string
-  appId: number | null
-  type: string
-  subtype: string | null
-  environment?: string
-  bundleId?: string
-  appName?: string | null
-  appIcon?: string | null
-  productId?: string | null
-  priceMilli?: number | null
-  currency?: string | null
-  country?: string | null
-  receivedAt: number
-}
-
 export interface MetricsDaily {
   app_id: number
   date: string
@@ -93,10 +77,23 @@ export interface Review {
   review_version: string | null
   created_at: number
   tags: string[]
+  response_body?: string | null
+  response_state?: string | null   // NULL=未回复 | PENDING_PUBLISH | PUBLISHED
+  responded_at?: number | null
+}
+
+export interface RatingDistribution {
+  distribution: Array<{ rating: number; count: number }>
+  total: number
+}
+
+export interface VersionCompare {
+  versions: Array<{ version: string; releasedAt: number | null; count: number; avg: number | null; badRate: number | null }>
 }
 
 export interface SubRow {
   original_transaction_id: string
+  product_name?: string | null
   app_id: number | null
   product_id: string
   status: string
@@ -128,6 +125,7 @@ export interface TimelineRow {
 
 export interface PurchaseRow {
   transaction_id: string
+  product_name?: string | null
   product_id: string
   type: string
   price_milli: number | null
@@ -164,32 +162,109 @@ export interface AlertRule {
   enabled: number
 }
 
-export interface AlertEvent {
+/** /api/activity 合流项：ASSN 事件或告警 */
+export type ActivityItem =
+  | {
+      kind: 'event'
+      id: string
+      ts: number
+      type: string
+      subtype: string | null
+      environment?: string
+      appId: number | null
+      appName: string | null
+      appIcon: string | null
+      bundleId?: string
+      productId: string | null
+      productName?: string | null
+      priceMilli: number | null
+      currency: string | null
+      country: string | null
+    }
+  | {
+      kind: 'alert'
+      id: string
+      ts: number
+      alertKind: string
+      title: string
+      body: string | null
+    }
+
+export interface SalesDaily {
+  date: string
+  downloads: number
+  iapUnits: number
+  proceedsUsdMilli: number
+}
+
+export interface Reconciliation {
+  days: Array<{ date: string; eventsUsdMilli: number; estimatedUsdMilli: number; actualUsdMilli: number }>
+  summary: {
+    eventsUsdMilli: number
+    estimatedUsdMilli: number
+    actualUsdMilli: number
+    proceedsRate: number
+    diffPct: number | null
+  }
+}
+
+export interface SubHealth {
+  windowDays: number
+  renewals: number
+  firstRenewals: number
+  repeatRenewals: number
+  expirations: number
+  renewalRate: number | null
+  churnedVoluntary: number
+  churnedInvoluntary: number
+  activeAtStart: number
+  churnRate: number | null
+  refunds: number
+  purchases: number
+  refundRate: number | null
+}
+
+export interface TrialCohort {
+  weekStart: string
+  starts: number
+  converted: number
+  rate: number
+}
+
+export interface BreakdownRow {
+  key: string
+  label: string | null
+  usdMilli: number
+  count: number
+}
+
+export interface CohortRow {
+  month: string
+  subs: number
+  revenueUsdMilli: number
+  ltvUsdMilli: number
+}
+
+export interface AppOverviewRow {
   id: number
-  kind: string
-  title: string
-  body: string
-  fired_at: number
-  delivered: number
+  name: string
+  icon: string | null
+  todayRevenueUsdMilli: number
+  activeSubs: number
+  trialSubs: number
+  riskSubs: number
+  todayReviews: number
+  todayReviewAvg: number | null
 }
 
-export function usd(milli: number): string {
-  return `$${(milli / 1000).toFixed(2)}`
+export interface DataHealth {
+  lastWebhookAt: number | null
+  fxUpdatedAt: number | null
+  fxAutoCount: number
+  unconverted: Array<{ currency: string; count: number }>
+  duplicateReviews: number
+  rawNotifications: number
+  rawPayloadBytes: number
+  reprocessInProgress: boolean
 }
 
-export function timeAgo(ts: number): string {
-  const diff = Date.now() - ts
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-
-  const d = new Date(ts)
-  const now = new Date()
-  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400_000)
-  const hm = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-  if (dayDiff === 1) return `昨天 ${hm}`
-  if (dayDiff <= 7) return `${dayDiff} 天前`
-  const md = `${d.getMonth() + 1}月${d.getDate()}日`
-  return d.getFullYear() === now.getFullYear() ? md : `${d.getFullYear()}年${md}`
-}

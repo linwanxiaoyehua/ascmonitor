@@ -133,7 +133,8 @@ function NavTree({ location }: { location: string }) {
         return (
           <div key={t.path} className="tab-item">
             <Link href={t.path} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
-              <Icon name={t.icon} size={22} />
+              {/* 移动端底栏图标（桌面侧边栏由 .tabbar a svg 强制 18px 覆盖） */}
+              <Icon name={t.icon} size={24} />
               {t.label}
             </Link>
             {/* 桌面：当前 tab 展开二级导航（基础样式 display:none，仅 ≥1024px 显示） */}

@@ -2,7 +2,7 @@
 // 移动端底部 TabBar，桌面（≥1024px）左侧边栏（含二级导航）
 // 含跟手的下拉刷新（iOS standalone 无原生 PTR）
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useLocation } from 'wouter'
 import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type ActivityItem, type AppRow } from '../lib/api'
@@ -120,8 +120,12 @@ function PullIndicator({ pull, refreshing, ready }: { pull: number; refreshing: 
 
 /** 侧边栏 / 底部 tab 共用的导航树 */
 function NavTree({ location }: { location: string }) {
+  // 移动端底栏选中胶囊靠 --active-tab 索引平移（见 .tab-slider）；未知路由回落 0
+  const activeIndex = Math.max(0, TABS.findIndex((t) => t.owns.some((p) => matchPath(location, p))))
   return (
-    <nav className="tabbar" aria-label="主导航">
+    <nav className="tabbar" aria-label="主导航" style={{ '--active-tab': activeIndex } as CSSProperties}>
+      {/* 移动端选中高亮滑块（桌面 ≥1024 隐藏）；切 tab 时 translateX 平移形成滑动动画 */}
+      <span className="tab-slider" aria-hidden="true" />
       <div className="tabbar-brand" aria-hidden="true">
         <Icon name="chart" size={22} />
         <span>ASCMonitor</span>

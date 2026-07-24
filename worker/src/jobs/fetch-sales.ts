@@ -5,7 +5,9 @@
 import { loadAscCredentials, fetchSalesReport, fetchSubscriptionReport, type AscCredentials } from '../lib/asc-api'
 import { Budget } from '../lib/budget'
 
-const BACKFILL_DAYS = 30
+// 账单报告回填窗口：ASC 最早可取约一年内。历史收入曲线用它，故拉深到一年。
+// 预算分片 + 已入库/空日期缓存：单次只补一部分，多次触发（或每日 cron）逐步填满。
+const BACKFILL_DAYS = 365
 
 function dateStr(offsetDays: number): string {
   return new Date(Date.now() - offsetDays * 86400_000).toISOString().slice(0, 10)

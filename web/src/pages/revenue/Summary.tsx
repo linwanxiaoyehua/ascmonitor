@@ -218,6 +218,58 @@ function DownloadsSection() {
   )
 }
 
+/* ---------- 历史收入（账单口径，累计 + 按月/日曲线）---------- */
+function HistoryRevenue() {
+  const appId = useAppFilter()
+  const [gran, setGran] = useState<'month' | 'day'>('month')
+  const { data } = useQuery({
+    queryKey: ['sales-daily', appId, 365],
+    queryFn: () => api<SalesDaily[]>(withAppParam('/api/sales/daily?days=365', appId)),
+  })
+  const sales = data ?? []
+  if (!sales.length) return null
+  const total = sales.reduce((s, d) => s + d.proceedsUsdMilli, 0)
+  const start = sales[0].date // 已按日期升序
+  const series =
+    gran === 'day'
+      ? sales.map((d) => ({ date: d.date, value: d.proceedsUsdMilli }))
+      : (() => {
+          const byMonth = new Map<string, number>()
+          for (const d of sales) {
+            const m = d.date.slice(0, 7)
+            byMonth.set(m, (byMonth.get(m) ?? 0) + d.proceedsUsdMilli)
+          }
+          return [...byMonth.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ date: m, value: v }))
+        })()
+
+  return (
+    <Section title="历史收入（账单）" className="mt-4">
+      <div className="chart-frame">
+        <div className="head">
+          <span className="total num">{fmtUsd(total)}</span>
+          <span className="label">累计 · 自 {start.slice(0, 7)} · 账单 T+1</span>
+          <span className="ml-auto">
+            <SegmentedControl
+              label="粒度"
+              options={[{ value: 'month', label: '按月' }, { value: 'day', label: '按日' }]}
+              value={gran}
+              onChange={setGran}
+            />
+          </span>
+        </div>
+        <TrendChart
+          type={gran === 'month' ? 'bar' : 'area'}
+          data={series}
+          series={[{ key: 'value', name: '收入', color: 'var(--chart-2)' }]}
+          format={fmtUsd}
+          axisFormat={fmtUsdCompact}
+          height={190}
+        />
+      </div>
+    </Section>
+  )
+}
+
 export function RevenueSummary() {
   const appId = useAppFilter()
   const caliber = useCaliber()
@@ -234,6 +286,7 @@ export function RevenueSummary() {
       <div className="mt-4"><RevenueKpis /></div>
       <RevenueBreakdown rate={rate} />
       <DownloadsSection />
+      <HistoryRevenue />
     </>
   )
 }

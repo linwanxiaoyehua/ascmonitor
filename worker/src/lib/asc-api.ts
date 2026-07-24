@@ -345,10 +345,13 @@ export interface NotificationHistoryPage {
 export async function fetchNotificationHistory(
   creds: AscCredentials,
   bundleId: string,
-  params: { startDate: number; endDate: number; paginationToken?: string }
+  params: { startDate: number; endDate: number; paginationToken?: string },
+  sandbox = false
 ): Promise<NotificationHistoryPage> {
   const jwt = await ascJwt(creds, bundleId)
-  const url = `https://api.appstoreconnect.apple.com/inApps/v1/notifications/history${params.paginationToken ? `?paginationToken=${encodeURIComponent(params.paginationToken)}` : ''}`
+  // App Store Server API 的主机与 App Store Connect API 不同（后者是 api.appstoreconnect.apple.com）
+  const host = sandbox ? 'https://api.storekit-sandbox.itunes.apple.com' : 'https://api.storekit.itunes.apple.com'
+  const url = `${host}/inApps/v1/notifications/history${params.paginationToken ? `?paginationToken=${encodeURIComponent(params.paginationToken)}` : ''}`
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },

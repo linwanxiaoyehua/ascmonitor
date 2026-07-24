@@ -38,53 +38,68 @@ export async function backfillNotificationsJob(
   const endDate = Date.now()
   const startDate = endDate - WINDOW_DAYS * 86400_000
 
+  // 生产与沙盒是两套独立数据，都过一遍；某环境无数据会 404，视为该环境完成、不整体失败
+  const ENVS: Array<{ key: string; sandbox: boolean; label: string }> = [
+    { key: 'prod', sandbox: false, label: '生产' },
+    { key: 'sbx', sandbox: true, label: '沙盒' },
+  ]
+  let firstError: string | null = null
+
   let inserted = 0
-  for (const app of apps.results) {
-    let st: AppState = state[app.bundle_id] ?? { token: null, done: false }
-    while (!st.done && budget.remaining > 4) {
-      let page
-      try {
-        page = await fetchNotificationHistory(creds, app.bundle_id, { startDate, endDate, paginationToken: st.token ?? undefined })
-      } catch (err) {
+  outer: for (const app of apps.results) {
+    for (const env of ENVS) {
+      const stKey = `${app.bundle_id}|${env.key}`
+      let st: AppState = state[stKey] ?? { token: null, done: false }
+      while (!st.done && budget.remaining > 4) {
+        let page
+        try {
+          page = await fetchNotificationHistory(creds, app.bundle_id, { startDate, endDate, paginationToken: st.token ?? undefined }, env.sandbox)
+        } catch (err) {
+          budget.spend(1)
+          const msg = err instanceof Error ? err.message : '未知错误'
+          // 404 = 该环境无对应数据（很常见）：静默标记完成，继续下一个环境
+          if (!/\b404\b/.test(msg) && !firstError) {
+            firstError = `拉取「${app.bundle_id}·${env.label}」失败：${msg}${/\b401\b/.test(msg) ? '（可能需在 App Store Connect → 用户与访问 → 集成 生成「In-App Purchase」密钥并填入凭证）' : ''}`
+          }
+          st = { token: null, done: true }
+          state[stKey] = st
+          break
+        }
         budget.spend(1)
-        await db.prepare("INSERT INTO config (key, value) VALUES ('backfill_notif_state', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(JSON.stringify(state)).run()
-        const msg = err instanceof Error ? err.message : '未知错误'
-        return { inserted, hasMore: true, skipped: `拉取「${app.bundle_id}」失败：${msg}${/\b401\b/.test(msg) ? '（可能需在 App Store Connect → 用户与访问 → 集成 生成「In-App Purchase」密钥并填入凭证）' : ''}` }
+
+        const stmts = page.notifications
+          .map((sp) => {
+            const payload = decodeJwsPayload<NotificationPayload>(sp)
+            if (!payload?.notificationUUID) return null
+            return db
+              .prepare(
+                `INSERT OR IGNORE INTO notifications_raw (uuid, app_id, type, subtype, signed_payload, decoded_json, received_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`
+              )
+              .bind(
+                payload.notificationUUID,
+                app.id,
+                payload.notificationType,
+                payload.subtype ?? null,
+                sp,
+                JSON.stringify(payload),
+                payload.signedDate ?? Date.now()
+              )
+          })
+          .filter((s): s is D1PreparedStatement => s !== null)
+
+        if (stmts.length) {
+          const results = await db.batch(stmts)
+          budget.spend(1)
+          for (const r of results) inserted += r.meta.changes ?? 0
+        }
+
+        st = { token: page.paginationToken ?? null, done: !page.hasMore }
+        state[stKey] = st
       }
-      budget.spend(1)
-
-      const stmts = page.notifications
-        .map((sp) => {
-          const payload = decodeJwsPayload<NotificationPayload>(sp)
-          if (!payload?.notificationUUID) return null
-          return db
-            .prepare(
-              `INSERT OR IGNORE INTO notifications_raw (uuid, app_id, type, subtype, signed_payload, decoded_json, received_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`
-            )
-            .bind(
-              payload.notificationUUID,
-              app.id,
-              payload.notificationType,
-              payload.subtype ?? null,
-              sp,
-              JSON.stringify(payload),
-              payload.signedDate ?? Date.now()
-            )
-        })
-        .filter((s): s is D1PreparedStatement => s !== null)
-
-      if (stmts.length) {
-        const results = await db.batch(stmts)
-        budget.spend(1)
-        for (const r of results) inserted += r.meta.changes ?? 0
-      }
-
-      st = { token: page.paginationToken ?? null, done: !page.hasMore }
-      state[app.bundle_id] = st
+      state[stKey] = st
+      if (budget.remaining <= 4) break outer
     }
-    state[app.bundle_id] = st
-    if (budget.remaining <= 4) break
   }
 
   await db
@@ -93,6 +108,7 @@ export async function backfillNotificationsJob(
     .run()
   budget.spend(1)
 
-  const hasMore = apps.results.some((a) => !state[a.bundle_id]?.done)
-  return { inserted, hasMore, skipped: '' }
+  const hasMore = apps.results.some((a) => ENVS.some((e) => !state[`${a.bundle_id}|${e.key}`]?.done))
+  // 有插入就算部分成功（不因某环境报错而阻塞）；完全没插入且有错才把错误抛给前端
+  return { inserted, hasMore, skipped: inserted === 0 && firstError ? firstError : '' }
 }

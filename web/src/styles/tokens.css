@@ -102,12 +102,12 @@
   --fs-4: 14px;
   --fs-5: 15px;
   --fs-5-5: 16px;
-  --fs-6: 17px;
-  --fs-7: 20px;
-  --fs-8: 22px;
-  --fs-9: 26px;
-  --fs-10: 32px;
-  --fs-11: clamp(40px, 5vw, 60px); /* NEW —— hero 收入巨字 */
+  --fs-6: 16px;
+  --fs-7: 18px;
+  --fs-8: 20px;
+  --fs-9: 23px;
+  --fs-10: 27px;
+  --fs-11: clamp(32px, 4vw, 46px); /* hero / 评分巨字（已收紧） */
 
   /* ---- 字重（新增 800/900）---- */
   --fw-medium: 500;
@@ -134,9 +134,9 @@
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px; /* NEW —— hero 卡 */
+  --radius-card: 10px;
+  --radius-lg: 13px;
+  --radius-xl: 16px; /* hero 卡（已收紧） */
   --radius-pill: 999px;
 
   /* ---- 命中区域下限 ---- */

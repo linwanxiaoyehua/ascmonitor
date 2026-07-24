@@ -30,7 +30,7 @@ function TodaySummary() {
     <div className="act-summary">
       {cells.map((c) => (
         <div className="as-cell" key={c.label}>
-          <div className="as-head"><span className={`stat-ic tone-${c.tone}`}><Icon name={c.icon} size={14} /></span>{c.label}</div>
+          <div className="as-head"><Icon name={c.icon} size={15} className={`as-ic tone-${c.tone}`} />{c.label}</div>
           <div className={`as-value num tone-${c.tone}`}>{c.value}</div>
         </div>
       ))}

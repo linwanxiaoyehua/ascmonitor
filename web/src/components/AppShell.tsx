@@ -27,8 +27,14 @@ function FreshnessDot() {
   if (ts === undefined) return null
   const age = ts == null ? Infinity : Date.now() - ts
   const level = age < 3600_000 ? 'ok' : age < 86400_000 ? 'stale' : 'dead'
+  const text = level === 'ok' ? '实时接入中' : level === 'stale' ? '接入延迟' : '未接入'
   const label = ts == null ? '还没有收到事件' : `最近事件 ${new Date(ts).toLocaleString('zh-CN')}`
-  return <span className={`fresh-dot ${level}`} title={label} aria-label={label} />
+  return (
+    <span className={`live-pill ${level}`} title={label} aria-label={label}>
+      <span className="fresh-dot" />
+      <span className="lp-text">{text}</span>
+    </span>
+  )
 }
 
 function RefreshButton() {

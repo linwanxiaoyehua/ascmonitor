@@ -262,6 +262,10 @@ function SubsList() {
 
 function PurchasesList() {
   const appId = useAppFilter()
+  // 四级折叠：类型(消耗型/买断/非续订) → 产品 → 国家 → 购买（对齐订阅树）
+  const [openType, setOpenType] = useState<Set<string>>(new Set(['Non-Consumable', 'Consumable', 'Non-Renewing Subscription']))
+  const [openProduct, setOpenProduct] = useState<Set<string>>(new Set())
+  const [openCountry, setOpenCountry] = useState<Set<string>>(new Set())
   const q = useInfiniteQuery({
     queryKey: ['purchases', appId],
     queryFn: ({ pageParam }) =>
@@ -279,22 +283,109 @@ function PurchasesList() {
     return <EmptyState icon="creditCard" title="还没有一次性购买" hint="买断、消耗型内购的付费记录会出现在这里" />
   }
 
+  const toggle = (setter: Dispatch<SetStateAction<Set<string>>>, key: string) =>
+    setter((prev) => {
+      const n = new Set(prev)
+      if (n.has(key)) n.delete(key)
+      else n.add(key)
+      return n
+    })
+
+  const renderRow = (p: PurchaseRow) => (
+    <ListRow
+      key={p.transaction_id}
+      title={
+        <>
+          {p.product_name ?? productDisplay(p.product_id, p.app_bundle_id)}
+          {p.refunded && <Badge tone="danger">已退款</Badge>}
+        </>
+      }
+      amount={{ milli: p.price_milli, currency: p.currency, sign: p.refunded ? 'neg' : 'pos' }}
+      time={p.purchase_date ?? 0}
+    />
+  )
+
+  // 产品→国家 子树（复用到每个类型桶下）
+  const productTree = (items: PurchaseRow[], prefix: string) => {
+    const byProduct = new Map<string, { label: string; icon: string | null; app: string; rows: PurchaseRow[] }>()
+    for (const p of items) {
+      const key = `${prefix}|${p.app_bundle_id ?? ''}|${p.product_id}`
+      const g = byProduct.get(key)
+      if (g) g.rows.push(p)
+      else
+        byProduct.set(key, {
+          label: p.product_name ?? productDisplay(p.product_id, p.app_bundle_id) ?? p.product_id,
+          icon: p.app_icon,
+          app: appLabelOf(p.app_name, p.app_bundle_id),
+          rows: [p],
+        })
+    }
+    return [...byProduct.entries()]
+      .sort((a, b) => b[1].rows.length - a[1].rows.length)
+      .map(([pKey, g]) => {
+        const pOpen = openProduct.has(pKey)
+        const byCountry = new Map<string, PurchaseRow[]>()
+        for (const p of g.rows) {
+          const c = p.country ?? '—'
+          const arr = byCountry.get(c)
+          if (arr) arr.push(p)
+          else byCountry.set(c, [p])
+        }
+        const countries = [...byCountry.entries()].sort((a, b) => b[1].length - a[1].length)
+        return (
+          <div className="tree-node" key={pKey}>
+            <button className={`tree-head lvl1${pOpen ? ' open' : ''}`} aria-expanded={pOpen} onClick={() => toggle(setOpenProduct, pKey)}>
+              <Icon name="chevronRight" size={16} className="tree-chev" />
+              <AppIcon url={g.icon} name={g.app || g.label} size={26} />
+              <span className="th-label">{g.label}</span>
+              <span className="th-count num">{g.rows.length}</span>
+            </button>
+            {pOpen && (
+              <div className="tree-children">
+                {countries.map(([country, crows]) => {
+                  const cKey = `${pKey}|${country}`
+                  const cOpen = openCountry.has(cKey)
+                  return (
+                    <div className="tree-node" key={cKey}>
+                      <button className={`tree-head lvl2${cOpen ? ' open' : ''}`} aria-expanded={cOpen} onClick={() => toggle(setOpenCountry, cKey)}>
+                        <Icon name="chevronRight" size={15} className="tree-chev" />
+                        <span className="th-label">{countryFlag(country)} {countryName(country) || countryDisplay(country) || country}</span>
+                        <span className="th-count num">{crows.length}</span>
+                      </button>
+                      {cOpen && <div className="list tree-leaf">{crows.map(renderRow)}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })
+  }
+
+  // 一级：按内购类型
+  const byType = new Map<string, PurchaseRow[]>()
+  for (const p of purchases) {
+    const arr = byType.get(p.type)
+    if (arr) arr.push(p)
+    else byType.set(p.type, [p])
+  }
+  const types = [...byType.entries()].sort((a, b) => b[1].length - a[1].length)
+
   return (
     <>
-      <div className="list">
-        {purchases.map((p) => {
-          const appLabel = appLabelOf(p.app_name, p.app_bundle_id)
-          const detail = [appLabel, PURCHASE_TYPES[p.type] ?? p.type, countryDisplay(p.country)].filter(Boolean).join(' · ')
+      <div className="sub-tree">
+        {types.map(([type, items]) => {
+          const tOpen = openType.has(type)
           return (
-            <ListRow
-              key={p.transaction_id}
-              leading={<AppIcon url={p.app_icon} name={appLabel || p.product_id} size={32} />}
-              title={p.product_name ?? productDisplay(p.product_id, p.app_bundle_id)}
-              badges={p.refunded ? <Badge tone="danger">已退款</Badge> : undefined}
-              detail={detail}
-              amount={{ milli: p.price_milli, currency: p.currency, sign: p.refunded ? 'neg' : 'pos' }}
-              time={p.purchase_date ?? 0}
-            />
+            <div className="tree-node" key={type}>
+              <button className={`tree-head lvl0${tOpen ? ' open' : ''}`} aria-expanded={tOpen} onClick={() => toggle(setOpenType, type)}>
+                <Icon name="chevronRight" size={16} className="tree-chev" />
+                <span className="th-label">{PURCHASE_TYPES[type] ?? type}</span>
+                <span className="th-count num">{items.length}</span>
+              </button>
+              {tOpen && <div className="tree-children">{productTree(items, type)}</div>}
+            </div>
           )
         })}
       </div>

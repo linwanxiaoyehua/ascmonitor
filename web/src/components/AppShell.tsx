@@ -9,6 +9,7 @@ import { api, type ActivityItem, type AppRow } from '../lib/api'
 import { syncUrl } from '../lib/app-filter'
 import { activeChild, activeTab, breadcrumb, matchPath, TABS } from '../lib/nav'
 import { AppSwitcher } from './AppSwitcher'
+import { CaliberSelect } from './CaliberSelect'
 import { Icon } from './Icon'
 import { isOverlayOpen } from './Sheet'
 
@@ -186,6 +187,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </nav>
             {showSwitcher && <AppSwitcher />}
             <span className="topbar-spacer" />
+            {/* 收入口径开关：唯一入口，仅收入页出现在顶栏 */}
+            {location.startsWith('/revenue') && <CaliberSelect />}
             <FreshnessDot />
             <RefreshButton />
           </div>

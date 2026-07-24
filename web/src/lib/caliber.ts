@@ -2,7 +2,7 @@
 //   gross  = 实时 · 客户价（events 原值）
 //   net    = 实时 · 估算净得（events × proceeds_rate）
 //   billed = 账单 · 实际（sales_daily，T+1）
-// 个人观察偏好：localStorage 持久、不进 URL。开关入口只在收入页头（CaliberSwitch）；
+// 个人观察偏好：localStorage 持久、不进 URL。开关入口只在收入页顶栏（CaliberSelect chip）；
 // 其他页面只读消费。模块不支持所选口径时就近降级并由 CaliberTag 如实标注（见 effectiveCaliber）。
 
 import { useSyncExternalStore } from 'react'

@@ -174,12 +174,8 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
     white-space: nowrap;
   }
   .shell-content.title-in-bar .page-header > .subtitle { display: none; }
-  /* 无操作、无返回的页头（总览/评分/设置主页）：整块收起，别留空白 */
-  .shell-content.title-in-bar .page-header:not(.sub):not(.has-actions) { display: block; padding: 0; }
-  /* 带操作的页头（收入的口径切换）：标题已上顶栏 → 操作区撑满整宽，
-     与下方子页签（.subnav）同宽对齐，避免右浮窄块与满宽子页签左右错位 */
-  .shell-content.title-in-bar .page-header.has-actions { display: block; padding: var(--s3) 0 0; }
-  .shell-content.title-in-bar .page-header.has-actions .actions { display: block; margin: 0; }
+  /* 页内大标题（无操作页头，含收入页——口径切换已移至顶栏）：整块收起，别留空白 */
+  .shell-content.title-in-bar .page-header:not(.sub) { display: block; padding: 0; }
   /* SubPage：只剩返回按钮，单独成行置顶 */
   .shell-content.title-in-bar .page-header.sub { padding: var(--s2) 0; }
 }

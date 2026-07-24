@@ -1,13 +1,11 @@
 // 收入（/revenue/:sub?）：概况 | 订阅健康 | 明细 三个子页
 // - 移动端：页内 .subnav 子页签（桌面隐藏，由侧边栏二级导航接管）
 // - 子页签是真链接（SegmentedLinks），可 ⌘/中键新开
-// - 全局口径开关（CaliberSwitch）唯一入口在此页头，作用于全部子页的金额模块
-//   桌面页内大标题隐藏，但页头带 actions 时保留操作区（见 .page-header.has-actions）
+// - 全局口径开关（CaliberSelect）唯一入口在顶栏（收入页时由 AppShell 渲染），作用于全部子页金额模块
 // 分发模式与 pages/settings 的 /settings/:section? 同构
 
 import { useLocation, useParams } from 'wouter'
 import { activeChild, activeTab, REVENUE_SUBS } from '../../lib/nav'
-import { CaliberSwitch } from '../../components/CaliberSwitch'
 import { PageHeader, SegmentedLinks } from '../../components/ui'
 import { RevenueSummary } from './Summary'
 import { RevenueHealth } from './Health'
@@ -24,7 +22,7 @@ export function RevenuePage() {
 
   return (
     <>
-      <PageHeader title="收入" actions={<CaliberSwitch />} />
+      <PageHeader title="收入" />
 
       <nav className="subnav" aria-label="收入子页">
         <SegmentedLinks options={REVENUE_SUBS} isActive={(p) => p === current} label="收入子页" />

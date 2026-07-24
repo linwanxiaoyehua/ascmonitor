@@ -226,7 +226,7 @@ function buildBody(
     // products 目录里的正式名优先，未同步到时回退 product_id 末段
     productName ?? productDisplay(tx?.productId, bundleId ?? tx?.bundleId),
     periodLabel(tx ? inferPeriod(tx) : null),
-    money(tx?.price, tx?.currency),
+    // 金额已提到通知标题，正文不再重复
   ]
     .filter(Boolean)
     .join(' ')
@@ -305,12 +305,16 @@ export async function processNotification(
   }
 
   const titleFn = NOTIFY_TITLES[type]
-  const title = titleFn?.(subtype) ?? null
+  const baseTitle = titleFn?.(subtype) ?? null
+  // 金额提到标题（带正负号）——推送弹窗一眼看清进/出多少；退款、撤销为负
+  const neg = type === 'REFUND' || type === 'REVOKE'
+  const amt = tx?.price != null && tx.price > 0 ? money(tx.price, tx.currency) : null
+  const title = baseTitle != null && amt ? `${baseTitle} ${neg ? '−' : '+'}${amt}` : baseTitle
   const body = buildBody(appName, bundleId, tx, productName)
   return {
     title: title ?? `${type}${subtype ? `/${subtype}` : ''}`,
     body,
     icon: appIcon,
-    notify: title != null,
+    notify: baseTitle != null,
   }
 }

@@ -1551,3 +1551,9 @@ button.kpi-card { cursor: pointer; }
   .live-pill { padding: 4px; background: transparent; }
   .live-pill .lp-text { display: none; }
 }
+
+/* 订阅明细：状态组内按国家二级分组 */
+.sub-country { margin-top: var(--s2-5); }
+.sub-country:first-child { margin-top: 0; }
+.subgroup-head { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s0-5) var(--s1-5); font-size: var(--fs-2); font-weight: var(--fw-semi); color: var(--text-2); }
+.subgroup-head .sg-count { margin-left: auto; color: var(--text-3); font-weight: var(--fw-medium); }

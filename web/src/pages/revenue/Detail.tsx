@@ -9,7 +9,7 @@ import {
 import { useAppFilter, withAppParam } from '../../lib/app-filter'
 import { fmtMoney, fmtUsd } from '../../lib/money'
 import {
-  appLabelOf, countryDisplay, expiresDisplay, periodLabel, productDisplay, subtypeLabel, timeAgo,
+  appLabelOf, countryDisplay, countryFlag, countryName, expiresDisplay, periodLabel, productDisplay, subtypeLabel, timeAgo,
 } from '../../lib/format'
 import { AppIcon } from '../../components/AppIcon'
 import {
@@ -132,60 +132,83 @@ function SubsList() {
     return <EmptyState icon="users" title="还没有订阅记录" hint="收到 App Store 订阅通知后会自动出现在这里" />
   }
 
+  const renderRow = (s: SubRow) => {
+    const open = expanded === s.original_transaction_id
+    const appLabel = appLabelOf(s.app_name, s.app_bundle_id)
+    // 已按国家分组时，行内 detail 不再重复国家
+    const detail = [
+      appLabel,
+      s.status === 'expired' || s.status === 'revoked' ? STATUS_LABELS[s.status] : expiresDisplay(s.expires_at),
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    return (
+      <div key={s.original_transaction_id}>
+        <ListRow
+          leading={<AppIcon url={s.app_icon} name={appLabel || s.product_id} size={32} />}
+          title={
+            <>
+              {s.product_name ?? productDisplay(s.product_id, s.app_bundle_id)}
+              {periodLabel(s.period) && <span className="muted">{periodLabel(s.period)}</span>}
+            </>
+          }
+          badges={
+            <>
+              {(s.status === 'grace_period' || s.status === 'billing_retry') && (
+                <Badge tone="warning">{STATUS_LABELS[s.status]}</Badge>
+              )}
+              {!s.auto_renew && (s.status === 'active' || s.status === 'trial') && (
+                <Badge tone="warning">已关续费</Badge>
+              )}
+            </>
+          }
+          detail={detail}
+          amount={{ milli: s.price_milli, currency: s.currency }}
+          time={s.updated_at}
+          trailing="chevron"
+          chevronOpen={open}
+          onPress={() => setExpanded(open ? null : s.original_transaction_id)}
+        />
+        {open && <Timeline otid={s.original_transaction_id} />}
+      </div>
+    )
+  }
+
   return (
     <>
       {STATUS_GROUPS.map((group) => {
         const items = subs.filter((s) => group.statuses.includes(s.status))
         if (!items.length) return null
+        // 组内 ≥2 个国家时二级按国家分组（避免「长一串」）；单一国家保持平铺
+        const byCountry = new Map<string, SubRow[]>()
+        for (const s of items) {
+          const c = s.country ?? '—'
+          const arr = byCountry.get(c)
+          if (arr) arr.push(s)
+          else byCountry.set(c, [s])
+        }
+        const grouped = byCountry.size >= 2
+        const countries = [...byCountry.entries()].sort((a, b) => b[1].length - a[1].length)
         return (
           <div key={group.title}>
             <div className="group-label">
               {group.title}
               <span className="count">{items.length}</span>
+              {grouped && <span className="count">{byCountry.size} 个地区</span>}
             </div>
-            <div className="list">
-              {items.map((s) => {
-                const open = expanded === s.original_transaction_id
-                const appLabel = appLabelOf(s.app_name, s.app_bundle_id)
-                const detail = [
-                  appLabel,
-                  countryDisplay(s.country),
-                  s.status === 'expired' || s.status === 'revoked' ? STATUS_LABELS[s.status] : expiresDisplay(s.expires_at),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-                return (
-                  <div key={s.original_transaction_id}>
-                    <ListRow
-                      leading={<AppIcon url={s.app_icon} name={appLabel || s.product_id} size={32} />}
-                      title={
-                        <>
-                          {s.product_name ?? productDisplay(s.product_id, s.app_bundle_id)}
-                          {periodLabel(s.period) && <span className="muted">{periodLabel(s.period)}</span>}
-                        </>
-                      }
-                      badges={
-                        <>
-                          {(s.status === 'grace_period' || s.status === 'billing_retry') && (
-                            <Badge tone="warning">{STATUS_LABELS[s.status]}</Badge>
-                          )}
-                          {!s.auto_renew && (s.status === 'active' || s.status === 'trial') && (
-                            <Badge tone="warning">已关续费</Badge>
-                          )}
-                        </>
-                      }
-                      detail={detail}
-                      amount={{ milli: s.price_milli, currency: s.currency }}
-                      time={s.updated_at}
-                      trailing="chevron"
-                      chevronOpen={open}
-                      onPress={() => setExpanded(open ? null : s.original_transaction_id)}
-                    />
-                    {open && <Timeline otid={s.original_transaction_id} />}
+            {grouped ? (
+              countries.map(([country, rows]) => (
+                <div className="sub-country" key={country}>
+                  <div className="subgroup-head">
+                    <span>{countryFlag(country)} {countryName(country) || countryDisplay(country) || country}</span>
+                    <span className="sg-count num">{rows.length}</span>
                   </div>
-                )
-              })}
-            </div>
+                  <div className="list">{rows.map(renderRow)}</div>
+                </div>
+              ))
+            ) : (
+              <div className="list">{items.map(renderRow)}</div>
+            )}
           </div>
         )
       })}

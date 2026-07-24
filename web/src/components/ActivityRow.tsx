@@ -24,7 +24,7 @@ const TYPE_META: Record<string, { label: string; icon: IconName; tone: Tone }> =
   EXPIRED: { label: '订阅过期', icon: 'clock', tone: 'neutral' },
   GRACE_PERIOD_EXPIRED: { label: '宽限期结束', icon: 'clock', tone: 'danger' },
   PRICE_INCREASE: { label: '价格上调', icon: 'trendingUp', tone: 'warning' },
-  CONSUMPTION_REQUEST: { label: '消耗查询', icon: 'info', tone: 'neutral' },
+  CONSUMPTION_REQUEST: { label: '请求退款', icon: 'info', tone: 'neutral' },
   RENEWAL_EXTENDED: { label: '续期顺延', icon: 'clock', tone: 'info' },
   TEST: { label: '测试通知', icon: 'flask', tone: 'neutral' },
 }
@@ -99,8 +99,11 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   const appLabel = appLabelOf(item.appName, item.bundleId)
   const isRevenue = REVENUE_TYPES.has(item.type)
   const isRefund = item.type === 'REFUND'
+  // 请求退款（Apple 询问消耗信息以裁定退款）：展示涉及金额，但钱未动，不带 +/− 符号
+  const isRefundRequest = item.type === 'CONSUMPTION_REQUEST'
   // 0 元交易（免费试用开始）不显示 "+¥0.00"
-  const showAmount = (isRevenue || isRefund) && item.priceMilli != null && item.priceMilli > 0
+  const showAmount = (isRevenue || isRefund || isRefundRequest) && item.priceMilli != null && item.priceMilli > 0
+  const amountSign = isRefund ? 'neg' : isRefundRequest ? undefined : 'pos'
   const detail = [
     appLabel,
     item.productName ?? productDisplay(item.productId, item.bundleId),
@@ -131,7 +134,7 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
       }
       badges={item.environment === 'Sandbox' ? <Badge tone="neutral">沙盒</Badge> : undefined}
       detail={detail}
-      amount={showAmount ? { milli: item.priceMilli, currency: item.currency, sign: isRefund ? 'neg' : 'pos' } : undefined}
+      amount={showAmount ? { milli: item.priceMilli, currency: item.currency, sign: amountSign } : undefined}
       time={item.ts}
     />
   )

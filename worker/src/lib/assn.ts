@@ -177,6 +177,21 @@ export async function verifyAppleJws<T = unknown>(jws: string, options: VerifyOp
   return JSON.parse(new TextDecoder().decode(b64urlDecode(payloadB64))) as T
 }
 
+/**
+ * 只解码 JWS 的 payload 段，不验签 —— 入库时已验过，回放与展示时省 CPU。
+ * 用于从 notifications_raw 自带的 signedTransactionInfo 直接取回交易信息
+ * （退款/消耗查询等复用既有交易的事件，靠 transactions join 取不到自身金额）。
+ */
+export function decodeJwsPayload<T = unknown>(jws: string | undefined | null): T | null {
+  if (!jws) return null
+  try {
+    const b64 = jws.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(b64)) as T
+  } catch {
+    return null
+  }
+}
+
 // ---- ASSN V2 payload 类型 ----
 
 export interface NotificationPayload {

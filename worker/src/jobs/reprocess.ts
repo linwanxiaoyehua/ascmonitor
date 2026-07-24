@@ -4,21 +4,10 @@
 // - 整批语句走 db.batch（计 1 子请求）：单批 = 读 1 + batch 1 + 游标 1 ≈ 3 子请求
 // - 游标存 config.reprocess_cursor，前端循环调用直到 done
 
-import type { NotificationPayload, TransactionInfo, RenewalInfo } from '../lib/assn'
+import { decodeJwsPayload, type NotificationPayload, type TransactionInfo, type RenewalInfo } from '../lib/assn'
 import { buildSubStatement, buildTxStatement } from '../lib/events'
 
 const BATCH_SIZE = 200
-
-/** 解码 JWS payload 段（不验签） */
-function decodeJwsPayload<T>(jws: string | undefined): T | null {
-  if (!jws) return null
-  try {
-    const b64 = jws.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(b64)) as T
-  } catch {
-    return null
-  }
-}
 
 interface Cursor {
   ts: number

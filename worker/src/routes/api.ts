@@ -11,6 +11,7 @@ import { revenueBreakdown, subHealth, trialCohorts } from '../lib/insights'
 import { createWebhook, deleteWebhook, loadAscCredentials, postReviewResponse } from '../lib/asc-api'
 import { describeState, type BuildScope } from '../lib/build-status'
 import { enrichApp, type AppLite } from '../lib/app-enrich'
+import { decodeJwsPayload, type TransactionInfo } from '../lib/assn'
 
 export const api = new Hono<{ Bindings: Env }>()
 
@@ -128,9 +129,9 @@ const ACTIVITY_KIND_TYPES: Record<string, string[]> = {
   refund: ['REFUND', 'REFUND_DECLINED', 'REFUND_REVERSED', 'REVOKE', 'CONSUMPTION_REQUEST'],
 }
 
-// 动态流里「会显示金额」的事件类型。
-// 刻意不等于 ACTIVITY_KIND_TYPES.revenue（那份含 OFFER_REDEEMED，但列表行不给它标金额），
-// 必须与 web/src/lib/format.ts 的 REVENUE_TYPES 保持一致，否则当日合计对不上各行。
+// 当日合计（day-totals）纳入的事件类型：收入正向 + 退款负向。
+// 刻意不含 CONSUMPTION_REQUEST —— 那只是「请求退款」，钱还没动，列表里展示金额但不显示 +/−、
+// 也不该并入当日净收入。收入部分须与 web/src/lib/format.ts 的 REVENUE_TYPES 一致。
 const AMOUNT_EVENT_TYPES = ['SUBSCRIBED', 'DID_RENEW', 'ONE_TIME_CHARGE', 'REFUND']
 
 api.get('/activity', async (c) => {
@@ -183,20 +184,36 @@ api.get('/activity', async (c) => {
           product_id: string | null; price_milli: number | null; currency: string | null; country: string | null
           product_name: string | null
         }>()
-        .then((rows) =>
-          rows.results.map((r) => {
+        .then(async (rows) => {
+          const items = rows.results.map((r) => {
             const decoded = JSON.parse(r.decoded_json)
+            // 退款 / 消耗查询等复用既有交易的事件，transactions.raw_uuid 指向原始购买通知，
+            // t.raw_uuid = n.uuid join 落空 —— 直接从通知自带的 signedTransactionInfo 解出金额/产品补齐
+            const tx = r.price_milli == null ? decodeJwsPayload<TransactionInfo>(decoded.data?.signedTransactionInfo) : null
             return {
               kind: 'event', id: r.uuid, ts: r.received_at,
               type: r.type, subtype: r.subtype,
               environment: decoded.data?.environment,
               appId: r.app_id, appName: r.app_name, appIcon: r.app_icon,
               bundleId: decoded.data?.bundleId ?? r.app_bundle_id,
-              productId: r.product_id, productName: r.product_name,
-              priceMilli: r.price_milli, currency: r.currency, country: r.country,
+              productId: r.product_id ?? tx?.productId ?? null,
+              productName: r.product_name as string | null, // 名称补齐见下
+              priceMilli: r.price_milli ?? tx?.price ?? null,
+              currency: r.currency ?? tx?.currency ?? null,
+              country: r.country ?? tx?.storefront ?? null,
             }
           })
-        )
+          // join 未命中（退款/消耗查询）的行没有 product_name，按 productId 批量补正式名
+          const missing = [...new Set(items.filter((i) => !i.productName && i.productId).map((i) => i.productId!))]
+          if (missing.length) {
+            const prods = await c.env.DB.prepare(
+              `SELECT product_id, name FROM products WHERE product_id IN (${missing.map(() => '?').join(',')})`
+            ).bind(...missing).all<{ product_id: string; name: string }>()
+            const names = new Map(prods.results.map((p) => [p.product_id, p.name]))
+            for (const i of items) if (!i.productName && i.productId) i.productName = names.get(i.productId) ?? null
+          }
+          return items
+        })
     )
   }
 
@@ -253,23 +270,32 @@ api.get('/activity/day-totals', async (c) => {
   if (appId) { conditions.push('n.app_id = ?'); binds.push(Number(appId)) }
   if (!includeSandbox) conditions.push(`json_extract(n.decoded_json, '$.data.environment') != 'Sandbox'`)
 
+  // LEFT JOIN：退款事件复用既有交易，raw_uuid 指向原始购买，join 落空 —— 靠下方 JWS 回退补金额，
+  // 否则退款不进聚合，当日合计就没扣退款（与列表里的 −金额 行对不上）
   const rows = await c.env.DB.prepare(
-    `SELECT n.type, n.received_at, t.price_milli, t.currency
+    `SELECT n.type, n.received_at, n.decoded_json, t.price_milli, t.currency
      FROM notifications_raw n
-     JOIN transactions t ON t.raw_uuid = n.uuid
+     LEFT JOIN transactions t ON t.raw_uuid = n.uuid
      WHERE ${conditions.join(' AND ')}`
   )
     .bind(...binds)
-    .all<{ type: string; received_at: number; price_milli: number | null; currency: string | null }>()
+    .all<{ type: string; received_at: number; decoded_json: string; price_milli: number | null; currency: string | null }>()
 
   const fx = await fxRates(c.env.DB)
   const totals = new Map<string, { usdMilli: number; count: number }>()
   for (const r of rows.results) {
-    if (!r.price_milli) continue // 0 元交易（免费试用开始）列表里也不显示金额
+    let priceMilli = r.price_milli
+    let currency = r.currency
+    if (priceMilli == null) {
+      const tx = decodeJwsPayload<TransactionInfo>(JSON.parse(r.decoded_json).data?.signedTransactionInfo)
+      priceMilli = tx?.price ?? null
+      currency = tx?.currency ?? null
+    }
+    if (!priceMilli) continue // 0 元交易（免费试用开始）列表里也不显示金额
     // 位移到本地时区后再取 UTC 日期串，等价于客户端的 dayKey()
     const date = new Date(r.received_at - tzOffsetMin * 60_000).toISOString().slice(0, 10)
     const agg = totals.get(date) ?? { usdMilli: 0, count: 0 }
-    const usd = toUsd(r.price_milli, r.currency, fx)
+    const usd = toUsd(priceMilli, currency, fx)
     agg.usdMilli += r.type === 'REFUND' ? -usd : usd
     agg.count++
     totals.set(date, agg)

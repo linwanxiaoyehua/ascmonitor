@@ -51,7 +51,8 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
 .shell-main {
   max-width: var(--w-main);
   margin: 0 auto;
-  padding: var(--s3) var(--s4) calc(76px + env(safe-area-inset-bottom));
+  /* 底部留白清过悬浮胶囊底栏（脱离边缘 + 胶囊高度） */
+  padding: var(--s3) var(--s4) calc(92px + env(safe-area-inset-bottom));
 }
 
 /* ---- TopBar（毛玻璃固定顶栏） ---- */
@@ -498,14 +499,25 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .chip.active .num { color: var(--accent); opacity: 0.7; }
 
 /* ---- TabBar（移动端底部；桌面 ≥1024px 变左侧边栏，见文件末尾 media query） ---- */
+/* 移动端底栏：iOS 26 液态玻璃悬浮胶囊 —— 脱离屏幕边缘、full-pill 圆角、
+   强毛玻璃透光（内容从下方透出）、悬浮阴影 + 顶部高光边模拟玻璃。 */
 .tabbar {
-  position: fixed; bottom: 0; left: 0; right: 0;
+  position: fixed;
+  left: 0; right: 0; margin: 0 auto;
+  bottom: calc(env(safe-area-inset-bottom) + var(--s2));
+  width: calc(100% - var(--s3) * 2);
+  max-width: 420px;
   display: flex; justify-content: space-around;
-  background: var(--bar-bg);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  padding: var(--s1-5) 0 calc(var(--s1) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-subtle);
+  /* 比共享 --bar-bg 更透，配强 blur/saturate 才有"液态玻璃"透光感（仍保 11px 标签可读） */
+  background: light-dark(rgba(246, 246, 248, 0.72), rgba(16, 16, 24, 0.66));
+  -webkit-backdrop-filter: saturate(190%) blur(24px);
+  backdrop-filter: saturate(190%) blur(24px);
+  padding: var(--s1) var(--s2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08));
   z-index: 100;
 }
 .tabbar a {
@@ -864,7 +876,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 
 /* ============ 平板 / 中等窗口（≥768px） ============ */
 @media (min-width: 768px) {
-  .shell-main { max-width: var(--w-narrow-lg); padding: var(--s4) var(--s5) calc(76px + env(safe-area-inset-bottom)); }
+  .shell-main { max-width: var(--w-narrow-lg); padding: var(--s4) var(--s5) calc(92px + env(safe-area-inset-bottom)); }
   .topbar-inner { max-width: var(--w-narrow-lg); }
 
   /* Sheet：底部抽屉 → 居中弹窗（平板上抽屉横向拉太宽） */
@@ -888,6 +900,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
     position: sticky;
     top: 0; bottom: auto; left: auto; right: auto;
     height: 100dvh;
+    width: auto; max-width: none; margin: 0;
     flex-direction: column;
     justify-content: flex-start;
     gap: var(--s0-5);
@@ -895,8 +908,11 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
     background: var(--bg-app);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    border-top: none;
+    /* 重置移动端悬浮胶囊的圆角/阴影/描边 —— 侧边栏是贴边直角 */
+    border: none;
     border-right: 1px solid var(--border-subtle);
+    border-radius: 0;
+    box-shadow: none;
   }
   .tabbar-brand {
     display: flex;

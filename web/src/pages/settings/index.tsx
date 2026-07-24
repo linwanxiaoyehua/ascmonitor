@@ -137,7 +137,7 @@ function SettingsHome() {
         <div className="list">
           <ListRow
             leading={<span className="row-icon"><Icon name="info" size={16} /></span>}
-            title="ASCMonitor"
+            title="Vantage"
             detail="App Store 收入 · 订阅 · 评分监控 PWA"
           />
         </div>

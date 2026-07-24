@@ -11,8 +11,8 @@ export default defineConfig({
       filename: 'sw.ts',
       registerType: 'autoUpdate',
       manifest: {
-        name: 'ASCMonitor',
-        short_name: 'ASCMonitor',
+        name: 'Vantage',
+        short_name: 'Vantage',
         description: 'App Store 收入 · 订阅 · 评分监控',
         theme_color: '#080b13',
         background_color: '#080b13',

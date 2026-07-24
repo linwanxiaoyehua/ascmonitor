@@ -6,7 +6,7 @@ import { precacheAndRoute } from 'workbox-precaching'
 precacheAndRoute(self.__WB_MANIFEST)
 
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? { title: 'ASCMonitor', body: '' }
+  const data = event.data?.json() ?? { title: 'Vantage', body: '' }
   event.waitUntil(
     self.registration.showNotification(data.title, {
       // 有 App 图标就用真实图标，通知一眼认出是哪个 App

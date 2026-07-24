@@ -198,7 +198,7 @@ function NavTree({ location }: { location: string }) {
         <span className="brand-icon-box">
           <Icon name="chart" size={18} />
         </span>
-        <span>ASCMonitor</span>
+        <span>Vantage</span>
       </div>
       {TABS.map((t, i) => {
         const routeActive = t.owns.some((p) => matchPath(location, p))

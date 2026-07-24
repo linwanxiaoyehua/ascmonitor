@@ -95,7 +95,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       <div className="login-icon accent-text">
         <Icon name="chart" size={44} />
       </div>
-      <h1 className="t-title center mb-5">ASCMonitor</h1>
+      <h1 className="t-title center mb-5">Vantage</h1>
       <div className="field">
         <label htmlFor="token-input">Access Token</label>
         <input

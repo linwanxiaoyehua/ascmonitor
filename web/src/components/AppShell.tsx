@@ -2,7 +2,10 @@
 // 移动端底部 TabBar，桌面（≥1024px）左侧边栏（含二级导航）
 // 含跟手的下拉刷新（iOS standalone 无原生 PTR）
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  useCallback, useEffect, useRef, useState,
+  type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
+} from 'react'
 import { Link, useLocation } from 'wouter'
 import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type ActivityItem, type AppRow } from '../lib/api'
@@ -120,29 +123,88 @@ function PullIndicator({ pull, refreshing, ready }: { pull: number; refreshing: 
 
 /** 侧边栏 / 底部 tab 共用的导航树 */
 function NavTree({ location }: { location: string }) {
+  const [, navigate] = useLocation()
   // 移动端底栏选中胶囊靠 --active-tab 索引平移（见 .tab-slider）；未知路由回落 0
   const activeIndex = Math.max(0, TABS.findIndex((t) => t.owns.some((p) => matchPath(location, p))))
+
+  // ---- 底栏胶囊拖动（仅移动端）：胶囊跟手，松手弹性吸附到最近 tab ----
+  const barRef = useRef<HTMLElement>(null)
+  const [drag, setDrag] = useState<number | null>(null) // 拖动中的分数索引；null=未拖动
+  const startX = useRef(0)
+  const moved = useRef(false)
+  const suppressClick = useRef(false)
+
+  const idxFromX = (clientX: number) => {
+    const r = barRef.current!.getBoundingClientRect()
+    const raw = (clientX - r.left) / (r.width / TABS.length) - 0.5 // 胶囊中心跟手指
+    return Math.max(0, Math.min(TABS.length - 1, raw))
+  }
+  const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
+    // 仅移动端底栏（桌面是纵向侧边栏，不拖）；忽略鼠标非左键
+    if (window.matchMedia('(min-width: 1024px)').matches) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    startX.current = e.clientX
+    moved.current = false
+    try { barRef.current?.setPointerCapture(e.pointerId) } catch { /* 某些环境不支持 */ }
+  }
+  const onPointerMove = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!barRef.current?.hasPointerCapture(e.pointerId)) return
+    if (!moved.current && Math.abs(e.clientX - startX.current) < 5) return // 超过阈值才算拖动
+    moved.current = true
+    setDrag(idxFromX(e.clientX))
+  }
+  const endDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!barRef.current?.hasPointerCapture(e.pointerId)) return
+    try { barRef.current?.releasePointerCapture(e.pointerId) } catch { /* noop */ }
+    if (moved.current) {
+      const target = Math.round(drag ?? activeIndex)
+      // 拖动结束的 pointerup 之后浏览器还会补发一次 click，抑制掉以免 Link 再导航一次
+      suppressClick.current = true
+      window.setTimeout(() => { suppressClick.current = false }, 60)
+      if (target !== activeIndex) navigate(TABS[target].path)
+    }
+    setDrag(null)
+    moved.current = false
+  }
+  const onClickCapture = (e: ReactMouseEvent<HTMLElement>) => {
+    if (suppressClick.current) { e.preventDefault(); e.stopPropagation() }
+  }
+
+  const dragging = drag != null
+  const shownIndex = dragging ? Math.round(drag) : activeIndex // 拖动中高亮胶囊所在 tab
+  const style = { '--active-tab': activeIndex, ...(dragging ? { '--drag-index': drag } : null) } as CSSProperties
+
   return (
-    <nav className="tabbar" aria-label="主导航" style={{ '--active-tab': activeIndex } as CSSProperties}>
-      {/* 移动端选中高亮滑块（桌面 ≥1024 隐藏）；切 tab 时 translateX 平移形成滑动动画 */}
+    <nav
+      ref={barRef}
+      className={`tabbar${dragging ? ' dragging' : ''}`}
+      aria-label="主导航"
+      style={style}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onClickCapture={onClickCapture}
+    >
+      {/* 移动端选中高亮滑块（桌面 ≥1024 隐藏）；切/拖 tab 时 translateX 平移形成滑动动画 */}
       <span className="tab-slider" aria-hidden="true" />
       <div className="tabbar-brand" aria-hidden="true">
         <Icon name="chart" size={22} />
         <span>ASCMonitor</span>
       </div>
-      {TABS.map((t) => {
-        const active = t.owns.some((p) => matchPath(location, p))
+      {TABS.map((t, i) => {
+        const routeActive = t.owns.some((p) => matchPath(location, p))
         // 最长匹配，否则 /revenue/health 会把二级项「概况」也点亮
-        const currentChild = active ? activeChild(t, location)?.path : undefined
+        const currentChild = routeActive ? activeChild(t, location)?.path : undefined
         return (
           <div key={t.path} className="tab-item">
-            <Link href={t.path} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
+            <Link href={t.path} className={i === shownIndex ? 'active' : ''} aria-current={i === activeIndex ? 'page' : undefined}>
               {/* 移动端底栏图标（桌面侧边栏由 .tabbar a svg 强制 18px 覆盖） */}
               <Icon name={t.icon} size={24} />
               {t.label}
             </Link>
             {/* 桌面：当前 tab 展开二级导航（基础样式 display:none，仅 ≥1024px 显示） */}
-            {t.children && active && (
+            {t.children && routeActive && (
               <div className="subnav-rail">
                 {t.children.map((c) => {
                   const childActive = c.path === currentChild

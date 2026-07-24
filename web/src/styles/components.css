@@ -538,27 +538,15 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   -webkit-backdrop-filter: blur(13px) saturate(175%) brightness(1.15);
   backdrop-filter: blur(13px) saturate(175%) brightness(1.15);
   padding: var(--s1) 0; /* 横向 0：末端 tab 选中时胶囊外沿贴着底栏边 */
-  border: 1px solid light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.14));
   border-radius: var(--radius-pill);
+  /* 边缘只用一条：inset 描边（淡）+ 顶部镜面高光，二者在顶部重合成单条亮边，
+     不再叠 border 造成"两层"。touch-action:none 让水平拖动交给 JS。 */
   box-shadow:
     var(--shadow-float),
-    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.16));
+    inset 0 0 0 1px light-dark(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08)),
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.16));
+  touch-action: none;
   z-index: 100;
-}
-/* 玻璃高光层：顶部镜面亮边 + 底部内发光 + 左右边缘冷暖色散（模拟折射，screen 提亮不挡内容）。
-   仅描边处着色，中部透明，故不影响图标可读性。 */
-.tabbar::after {
-  content: '';
-  position: absolute; inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 2;
-  mix-blend-mode: screen;
-  box-shadow:
-    inset 1.5px 0 0 rgba(255, 116, 138, 0.26),
-    inset -1.5px 0 0 rgba(96, 204, 255, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -12px 20px rgba(255, 255, 255, 0.05);
 }
 .tabbar a {
   position: relative;
@@ -583,7 +571,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   left: 0; top: var(--s0-5); bottom: var(--s0-5); /* 纵向铺满，上下贴近底栏分栏 */
   width: 25%;
   transform: translateX(calc(var(--active-tab, 0) * 100%));
-  transition: transform 0.34s cubic-bezier(0.34, 1.1, 0.4, 1); /* 轻微回弹 */
+  transition: transform 0.4s cubic-bezier(0.34, 1.5, 0.4, 1); /* iOS 弹性吸附 */
   z-index: -1;
   pointer-events: none;
 }
@@ -591,14 +579,23 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   content: '';
   position: absolute;
   inset: 0 var(--s1); /* 纵向填满贴上下，横向内缩一点保持胶囊 */
-  /* 更亮更透的玻璃胶囊：偏白半透（非实蓝）+ 顶部亮边，选中的品牌蓝身份由图标/文字承担 */
-  background: light-dark(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.14));
+  /* 亮玻璃胶囊，但带品牌蓝 tint 与其余部分区分（选中身份既在底色也在图标/文字） */
+  background: light-dark(rgba(87, 108, 219, 0.2), rgba(127, 148, 255, 0.26));
   border-radius: var(--radius-pill);
   box-shadow:
-    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.24)),
-    inset 0 -1px 1px light-dark(rgba(20, 20, 40, 0.04), rgba(0, 0, 0, 0.18));
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.28)),
+    0 1px 3px light-dark(rgba(87, 108, 219, 0.22), rgba(0, 0, 0, 0.28));
+  transition: transform 0.4s cubic-bezier(0.34, 1.5, 0.4, 1);
 }
-@media (prefers-reduced-motion: reduce) { .tab-slider { transition: none; } }
+/* 拖动中：胶囊跟手（无过渡），并被"拉长"呈液态感（松手后 ::before 弹回 scale(1)） */
+.tabbar.dragging .tab-slider {
+  transition: none;
+  transform: translateX(calc(var(--drag-index, 0) * 100%));
+}
+.tabbar.dragging .tab-slider::before { transform: scaleX(1.12) scaleY(0.92); }
+@media (prefers-reduced-motion: reduce) {
+  .tab-slider, .tab-slider::before { transition: none; }
+}
 .tabbar a:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: var(--radius-control); }
 .tabbar-brand { display: none; }
 /* .tab-item 移动端透传布局（a 直接参与 tabbar flex）；二级导航仅桌面显示 */

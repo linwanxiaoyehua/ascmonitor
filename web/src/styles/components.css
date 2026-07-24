@@ -162,6 +162,26 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
 .page-header.sub { align-items: center; }
 .back-btn { margin-left: calc(-1 * var(--s2)); }
 
+/* 移动 / 平板：无 App 切换器时（单 App / 设置），页标题上移顶栏 Header（.topbar-crumb），
+   隐藏页内大标题以免重复 —— 与桌面同一套语义。SubPage 的返回按钮保留（移动端唯一返回入口）。 */
+@media (max-width: 1023px) {
+  .shell-content.title-in-bar .page-header > h1 {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .shell-content.title-in-bar .page-header > .subtitle { display: none; }
+  /* 无操作、无返回的页头（总览/评分/设置主页）：整块收起，别留空白 */
+  .shell-content.title-in-bar .page-header:not(.sub):not(.has-actions) { display: block; padding: 0; }
+  /* 带操作的页头（收入的口径切换）：只右对齐操作区 */
+  .shell-content.title-in-bar .page-header.has-actions { justify-content: flex-end; padding: var(--s2) 0; }
+  /* SubPage：只剩返回按钮，单独成行置顶 */
+  .shell-content.title-in-bar .page-header.sub { padding: var(--s2) 0; }
+}
+
 /* ---- Section（页面主模块；三级层次：页题 22 > 模块 15 > 分组 12） ---- */
 .section { margin-top: var(--s6); }
 .section-head {

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'wouter'
 import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type ActivityItem } from '../lib/api'
+import { api, type ActivityItem, type AppRow } from '../lib/api'
 import { syncUrl } from '../lib/app-filter'
 import { activeChild, activeTab, breadcrumb, matchPath, TABS } from '../lib/nav'
 import { AppSwitcher } from './AppSwitcher'
@@ -158,9 +158,10 @@ function NavTree({ location }: { location: string }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation()
   const ptr = usePullToRefresh()
-  // 设置页是全局配置，与 App 筛选无关 —— 不显示切换器。
-  // 切换器在只有一个 App 时会自行返回 null（见 AppSwitcher），顶栏左侧留空、标题仍在内容区。
-  const showSwitcher = activeTab(location)?.path !== '/settings'
+  const { data: apps } = useQuery({ queryKey: ['apps'], queryFn: () => api<AppRow[]>('/api/apps') })
+  // 只有一个 App 时切换器是纯占位 —— 不显示。设置页与 App 筛选无关，同样不显示。
+  // 无切换器时（title-in-bar）：页标题上移顶栏，内容区大标题隐藏（见 components.css）。
+  const showSwitcher = activeTab(location)?.path !== '/settings' && (apps?.length ?? 0) > 1
   const crumbs = breadcrumb(location)
 
   // 路由切换：把 ?app= 写回 URL（Link 导航会丢 query）并回到顶部
@@ -172,7 +173,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <NavTree location={location} />
-      <div className="shell-content">
+      <div className={`shell-content${showSwitcher ? '' : ' title-in-bar'}`}>
         <header className="topbar">
           <div className={`topbar-inner${showSwitcher ? '' : ' solo'}`}>
             <nav className="topbar-crumb" aria-label="当前位置">

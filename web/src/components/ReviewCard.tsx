@@ -33,7 +33,7 @@ export function ReviewCard({ review: r }: { review: Review }) {
   })
 
   return (
-    <article className="review-card">
+    <article className={`review-card${r.rating <= 2 ? ' bad' : ''}`}>
       <div className="meta">
         <Stars rating={r.rating} />
         {r.country && (

@@ -11,35 +11,10 @@ import {
 import { useAppFilter, withAppParam } from '../lib/app-filter'
 import { countryFlag, countryName } from '../lib/format'
 import { DistributionBars } from '../components/DistributionBars'
+import { Stars } from '../components/Icon'
 import { ReviewCard } from '../components/ReviewCard'
 import { Sparkline } from '../components/Sparkline'
 import { EmptyState, FilterChips, LoadMore, PageHeader, Section, SegmentedControl, Skeleton, StatCard } from '../components/ui'
-
-/** 评分分布（近 90 天文字评论样本；官方无全量分布 API） */
-function RatingDist() {
-  const appId = useAppFilter()
-  const { data } = useQuery({
-    queryKey: ['rating-dist', appId],
-    queryFn: () => api<RatingDistribution>(withAppParam('/api/reviews/distribution?days=90', appId)),
-  })
-  if (!data || data.total === 0) return null
-  return (
-    <Section title="评分分布">
-      <div className="panel pad">
-        <DistributionBars
-          variant="rating"
-          data={data.distribution.map((d) => ({
-            key: String(d.rating),
-            label: `${d.rating} ★`,
-            value: d.count,
-            display: `${d.count} · ${data.total ? Math.round((d.count / data.total) * 100) : 0}%`,
-          }))}
-        />
-        <p className="muted hint">样本 = 近 90 天已抓取的文字评论</p>
-      </div>
-    </Section>
-  )
-}
 
 /** 版本前后对比（仅选定单 App；review_version 来自 RSS） */
 function VersionCompareCard() {
@@ -82,52 +57,93 @@ function weightedByDate(snapshots: RatingSnapshot[]): Array<{ date: string; avg:
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
-function RatingHero() {
+/** 评分总览（对齐 评论评分.dc.html HERO）：平均分 | 评分分布 | 评分趋势 + 按国家，一张 3 列卡 */
+function RatingOverview() {
   const appId = useAppFilter()
-  const { data: snapshots, isPending } = useQuery({
+  const snapshotsQ = useQuery({
     queryKey: ['ratings', appId],
     queryFn: () => api<RatingSnapshot[]>(withAppParam('/api/ratings?days=30', appId)),
   })
+  const distQ = useQuery({
+    queryKey: ['rating-dist', appId],
+    queryFn: () => api<RatingDistribution>(withAppParam('/api/reviews/distribution?days=90', appId)),
+  })
 
-  if (isPending) return <Skeleton variant="hero" />
-  if (!snapshots?.length) return null
+  if (snapshotsQ.isPending || distQ.isPending) return <Skeleton variant="hero" />
 
+  const snapshots = snapshotsQ.data ?? []
+  const dist = distQ.data
   const trend = weightedByDate(snapshots)
-  if (!trend.length) return null
-  const latest = trend[trend.length - 1]
-  const weekAgoDate = new Date(Date.parse(latest.date) - 7 * 86400_000).toISOString().slice(0, 10)
-  const base = [...trend].reverse().find((d) => d.date <= weekAgoDate)
-  const delta = base ? latest.avg - base.avg : null
+  const latest = trend.length ? trend[trend.length - 1] : null
 
-  const countries = snapshots
-    .filter((s) => s.date === latest.date && s.ratings_count)
-    .sort((a, b) => (b.ratings_count ?? 0) - (a.ratings_count ?? 0))
-    .slice(0, 6)
+  // 均分优先用官方快照；无快照则退回文字评论分布的加权均分
+  const distAvg = dist && dist.total > 0
+    ? dist.distribution.reduce((s, d) => s + d.rating * d.count, 0) / dist.total
+    : null
+  const avg = latest?.avg ?? distAvg
+  if (avg == null) return null
+  const count = latest?.count ?? dist?.total ?? 0
+
+  let delta: number | null = null
+  if (latest) {
+    const weekAgoDate = new Date(Date.parse(latest.date) - 7 * 86400_000).toISOString().slice(0, 10)
+    const base = [...trend].reverse().find((d) => d.date <= weekAgoDate)
+    delta = base ? latest.avg - base.avg : null
+  }
+
+  const countries = latest
+    ? snapshots
+        .filter((s) => s.date === latest.date && s.ratings_count)
+        .sort((a, b) => (b.ratings_count ?? 0) - (a.ratings_count ?? 0))
+        .slice(0, 6)
+    : []
 
   return (
-    <div className="chart-frame mb-3">
-      <div className="head">
-        <span className="total num">
-          {latest.avg.toFixed(2)} <span className="star-text">★</span>
-        </span>
-        <span className="label num">
-          {latest.count.toLocaleString()} 个评分
+    <div className="rating-overview panel pad mb-3">
+      {/* 平均分 */}
+      <div className="ro-avg">
+        <div className="ro-avg-num">
+          <span className="num">{avg.toFixed(1)}</span>
+          <span className="ro-slash">/5</span>
+        </div>
+        <Stars rating={Math.round(avg)} />
+        <div className="ro-avg-sub">
+          共 {count.toLocaleString()} 个评分
           {delta != null && Math.abs(delta) >= 0.005 && (
-            <span className={delta > 0 ? 'delta-up' : 'delta-down'}>
-              {' '}{delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(2)} / 7天
-            </span>
+            <b className={delta > 0 ? 'delta-up' : 'delta-down'}> {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(2)} / 7天</b>
           )}
-        </span>
+        </div>
       </div>
-      {trend.length >= 4 && <Sparkline data={trend.map((d) => d.avg)} height={40} />}
-      {countries.length > 1 && (
-        <div className="country-ratings">
-          {countries.map((c) => (
-            <span key={c.country} className="country-rating num" title={countryName(c.country)}>
-              {countryFlag(c.country)} {c.avg_rating?.toFixed(1)}
-              <span className="muted">（{c.ratings_count}）</span>
-            </span>
-          ))}
+      {/* 评分分布 */}
+      {dist && dist.total > 0 && (
+        <div className="ro-dist">
+          <div className="ro-col-title">评分分布</div>
+          <DistributionBars
+            variant="rating"
+            data={dist.distribution.map((d) => ({
+              key: String(d.rating),
+              label: `${d.rating} ★`,
+              value: d.count,
+              display: `${d.count} · ${Math.round((d.count / dist.total) * 100)}%`,
+            }))}
+          />
+        </div>
+      )}
+      {/* 评分趋势 + 按国家 */}
+      {(trend.length >= 4 || countries.length > 1) && (
+        <div className="ro-trend">
+          <div className="ro-col-title">评分趋势 · 30 天</div>
+          {trend.length >= 4 && <Sparkline data={trend.map((d) => d.avg)} height={40} />}
+          {countries.length > 1 && (
+            <div className="country-ratings">
+              {countries.map((c) => (
+                <span key={c.country} className="country-rating num" title={countryName(c.country)}>
+                  {countryFlag(c.country)} {c.avg_rating?.toFixed(1)}
+                  <span className="muted">（{c.ratings_count}）</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -178,8 +194,7 @@ export function ReviewsPage() {
   return (
     <div className="narrow-lg">
       <PageHeader title="评分" />
-      <RatingHero />
-      <RatingDist />
+      <RatingOverview />
       <VersionCompareCard />
 
       <div className="vstack mb-3">

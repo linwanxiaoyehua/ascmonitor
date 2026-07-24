@@ -9,7 +9,7 @@ import {
 export interface TrendSeries {
   key: string
   name: string
-  color?: string // CSS 变量或颜色值，缺省按序取 --chart-1..6
+  color?: string
   stackId?: string
 }
 
@@ -29,10 +29,7 @@ const DEFAULT_COLORS = [
   'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)', 'var(--chart-7)',
 ]
 
-/** 数据点少时逐点标记；30 天序列全打点会糊成一片，交给 hover 的 activeDot */
 const DOT_LIMIT = 14
-
-/** 第二条及之后的序列改虚线：色相之外再加一重编码，色盲用户也能区分 */
 const DASH_PATTERNS = [undefined, '5 3', '2 3', '8 3 2 3']
 
 function ChartTooltip({
@@ -50,7 +47,7 @@ function ChartTooltip({
       {payload.map((p) => (
         <div className="tt-row" key={p.name}>
           <span className="tt-swatch" style={{ background: p.color ?? p.fill }} />
-          {p.name} {format(p.value)}
+          <span>{p.name}: <strong>{format(p.value)}</strong></span>
         </div>
       ))}
     </div>
@@ -61,7 +58,6 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
   if (!data.length) {
     return <div className="chart-empty">暂无数据</div>
   }
-  // 移动端密度：X 轴只标首末日期
   const ticks = data.length > 1 ? [data[0].date as string, data[data.length - 1].date as string] : undefined
   const showLegend = series.length > 1
   const axisProps = {
@@ -76,7 +72,6 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
         interval="preserveStartEnd"
       />
     ),
-    // Y 轴显示紧凑刻度（原来 hide，看不出量级）
     yAxis: (
       <YAxis
         domain={[0, 'auto'] as const}
@@ -88,22 +83,20 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
         tickCount={4}
       />
     ),
-    grid: <CartesianGrid vertical={false} stroke="var(--chart-grid)" />,
-    tooltip: <Tooltip content={<ChartTooltip format={format} />} cursor={{ fill: 'var(--chart-grid)', stroke: 'var(--border-strong)' }} />,
-    // 图例文字不能用序列色 —— 那是为 2px 线条调的（3:1），落到 12px 文字上只有 3.1:1。
-    // 色块保留序列色，文字走 --text-2。
+    grid: <CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 3" />,
+    tooltip: <Tooltip content={<ChartTooltip format={format} />} cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }} />,
     legend: showLegend ? (
       <Legend
         iconType="circle"
         iconSize={8}
         wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-        formatter={(value: string) => <span style={{ color: 'var(--text-2)' }}>{value}</span>}
+        formatter={(value: string) => <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{value}</span>}
       />
     ) : null,
   }
 
   const colorOf = (s: TrendSeries, i: number) => s.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length]
-  const margin = { top: 4, right: 4, left: 0, bottom: 0 }
+  const margin = { top: 6, right: 6, left: 0, bottom: 0 }
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -111,13 +104,22 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
         <BarChart data={data} margin={margin}>
           {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{axisProps.tooltip}{axisProps.legend}
           {series.map((s, i) => (
-            <Bar key={s.key} dataKey={s.key} name={s.name} stackId={s.stackId} fill={colorOf(s, i)} radius={s.stackId ? 0 : [3, 3, 0, 0]} maxBarSize={22} />
+            <Bar key={s.key} dataKey={s.key} name={s.name} stackId={s.stackId} fill={colorOf(s, i)} radius={s.stackId ? 0 : [4, 4, 0, 0]} maxBarSize={22} />
           ))}
         </BarChart>
       ) : type === 'area' ? (
         <AreaChart data={data} margin={margin}>
-          {/* 不用渐变填充：渐变会把视觉重量压在色块上而非趋势线上。
-              保留 7% 单色底以维持 area 的语义重量，其余交给 2px 描边。 */}
+          <defs>
+            {series.map((s, i) => {
+              const c = colorOf(s, i)
+              return (
+                <linearGradient key={`grad-${s.key}`} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={c} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={c} stopOpacity={0.02} />
+                </linearGradient>
+              )
+            })}
+          </defs>
           {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{axisProps.tooltip}{axisProps.legend}
           {series.map((s, i) => (
             <Area
@@ -125,12 +127,11 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
               dataKey={s.key}
               name={s.name}
               stroke={colorOf(s, i)}
-              strokeWidth={2}
+              strokeWidth={2.2}
               strokeDasharray={DASH_PATTERNS[i % DASH_PATTERNS.length]}
-              fill={colorOf(s, i)}
-              fillOpacity={0.07}
-              dot={data.length <= DOT_LIMIT ? { r: 2.5, strokeWidth: 0, fill: colorOf(s, i) } : false}
-              activeDot={{ r: 3.5, strokeWidth: 0 }}
+              fill={`url(#grad-${s.key})`}
+              dot={data.length <= DOT_LIMIT ? { r: 3, strokeWidth: 0, fill: colorOf(s, i) } : false}
+              activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--bg-surface)' }}
             />
           ))}
         </AreaChart>
@@ -143,10 +144,10 @@ export default function TrendChartInner({ type, data, series, format, axisFormat
               dataKey={s.key}
               name={s.name}
               stroke={colorOf(s, i)}
-              strokeWidth={2}
+              strokeWidth={2.2}
               strokeDasharray={DASH_PATTERNS[i % DASH_PATTERNS.length]}
-              dot={data.length <= DOT_LIMIT ? { r: 2.5, strokeWidth: 0, fill: colorOf(s, i) } : false}
-              activeDot={{ r: 3.5, strokeWidth: 0 }}
+              dot={data.length <= DOT_LIMIT ? { r: 3, strokeWidth: 0, fill: colorOf(s, i) } : false}
+              activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--bg-surface)' }}
             />
           ))}
         </LineChart>

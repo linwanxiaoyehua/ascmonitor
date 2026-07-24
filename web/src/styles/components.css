@@ -231,21 +231,25 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
   border: none;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  padding: var(--s4); /* 放开一档：四周 16px */
+  padding: var(--s4);
   display: flex;
   flex-direction: column;
   gap: var(--s1);
   min-width: 0;
-  min-height: 108px; /* 与 .skeleton.h-card 对齐，避免加载完跳动 */
+  min-height: 108px;
   text-align: left;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-/* KPI 图标语义色片：指标身份色的小圆角底片（收入绿/订阅紫/活跃 teal/退款红…）。
-   缺省无 tone 时沿用灰图标、不带底片。 */
+.stat-card:hover {
+  box-shadow: var(--shadow-pop);
+}
+/* KPI 图标语义色片 */
 .stat-card .stat-ic { display: inline-flex; flex: none; color: var(--text-3); }
 .stat-card .stat-ic[class*='tone-'] {
-  width: 28px; height: 28px;
+  width: 32px; height: 32px;
   border-radius: var(--radius-control);
   align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 .stat-card .stat-ic.tone-accent { background: var(--accent-soft); color: var(--accent-text); }
 .stat-card .stat-ic.tone-success { background: var(--success-soft); color: var(--success-icon); }
@@ -253,26 +257,25 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
 .stat-card .stat-ic.tone-info { background: var(--info-soft); color: var(--info-icon); }
 .stat-card .stat-ic.tone-violet { background: var(--violet-soft); color: var(--violet-icon); }
 .stat-card .stat-ic.tone-teal { background: var(--teal-soft); color: var(--teal-icon); }
-button.stat-card { cursor: pointer; font-family: inherit; transition: background var(--dur) var(--ease), transform var(--dur) var(--ease); }
-button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); }
-/* ---- 主 KPI（hero）：桌面占双倍宽度，左文字右趋势 ----
-   趋势图独立占位而非铺在卡片底做背景 —— 背景式会与注脚文字重叠，
-   在「新订 7 · 续费 14 · 退款 1」这种长注脚上尤其糟。 */
+button.stat-card { cursor: pointer; font-family: inherit; }
+button.stat-card:active { background: var(--bg-raised); transform: scale(0.985); }
+/* ---- 主 KPI（hero）：桌面占双倍宽度，左文字右趋势 ---- */
 .stat-card .stat-main { display: flex; flex-direction: column; gap: var(--s0-5); min-width: 0; flex: 1; }
-.stat-card.hero { flex-direction: row; align-items: center; gap: var(--s4); }
-.stat-card.hero .value { font-size: var(--fs-10); }
+.stat-card.hero {
+  flex-direction: row; align-items: center; gap: var(--s4);
+  background: linear-gradient(135deg, var(--bg-surface), light-dark(rgba(79, 70, 229, 0.05), rgba(99, 102, 241, 0.1)));
+  box-shadow: var(--shadow-card), 0 0 16px light-dark(rgba(79, 70, 229, 0.06), rgba(99, 102, 241, 0.12));
+}
+.stat-card.hero .value { font-size: var(--fs-10); font-weight: 800; }
 .stat-card.hero .stat-spark {
   flex: none;
   width: 40%; max-width: 180px;
-  color: var(--chart-2); /* 收入=绿，与收入趋势图同色相 */
-  opacity: 0.85;
+  color: var(--chart-2);
+  opacity: 0.95;
 }
-.stat-card.hero .stat-spark .spark-line { stroke: currentColor; }
-/* 移动端不做主次：窄屏里双倍宽等于占满整行，反而挤掉其余 KPI */
+.stat-card.hero .stat-spark .spark-line { stroke: currentColor; stroke-width: 2.2; }
+/* 移动端不做主次 */
 @media (max-width: 767px) {
-  /* 375px 下小卡仅 ~165px，「活跃订阅 + ASC·07-19」放不下会把 label 截成「活跃...」。
-     图标是装饰（label 已说明是什么），口径徽标和 label 都是信息 —— 牺牲图标保信息。
-     只对带徽标的卡生效，其余卡保留图标。 */
   .stat-card:has(.stat-badge) .stat-ic { display: none; }
   .stat-card.hero { flex-direction: column; align-items: stretch; gap: var(--s0-5); }
   .stat-card.hero .value { font-size: var(--fs-9); }
@@ -284,36 +287,49 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   font-size: var(--fs-2); font-weight: var(--fw-medium); color: var(--text-2);
   white-space: nowrap; overflow: hidden; min-width: 0;
 }
-.stat-card .stat-ic svg { flex: none; color: inherit; } /* 图标继承色片颜色 */
+.stat-card .stat-ic svg { flex: none; color: inherit; }
 .stat-card .label-text { overflow: hidden; text-overflow: ellipsis; }
-/* 口径徽标在 label 行内靠右，长 label 由 ellipsis 让位 */
 .stat-card .stat-badge { margin-left: auto; flex: none; }
 .stat-card .value {
-  font-size: var(--fs-9); font-weight: var(--fw-bold);
-  letter-spacing: -0.025em;
-  line-height: 1.3;
+  font-size: var(--fs-9); font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
   color: var(--text-1);
+  font-variant-numeric: tabular-nums;
 }
-/* 主指标（今日收入 hero）数字上品牌色，作为整屏的色彩焦点 */
 .stat-card.hero .value { color: var(--accent-text); }
 .stat-card .foot {
   display: flex; align-items: center; gap: var(--s1-5); flex-wrap: wrap;
-  min-height: var(--s4); /* 恒占位，有无注脚高度一致 */
+  min-height: var(--s4);
   font-size: var(--fs-2); color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
-.stat-card .delta { font-weight: var(--fw-semi); }
-.stat-card .delta.up { color: var(--success); }
-.stat-card .delta.down { color: var(--danger); }
+.stat-card .delta {
+  font-weight: var(--fw-semi);
+  font-size: var(--fs-1);
+  padding: 1px var(--s2);
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s0-5);
+}
+.stat-card .delta.up { color: var(--success); background: var(--success-soft); }
+.stat-card .delta.down { color: var(--danger); background: var(--danger-soft); }
 
 /* ---- Badge（5 tone） ---- */
 .badge {
   display: inline-flex; align-items: center;
   font-size: var(--fs-1); font-weight: var(--fw-semi);
-  padding: 1px var(--s2);
+  padding: 2px var(--s2-5);
   border-radius: var(--radius-pill);
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
+.badge.tone-neutral { background: var(--neutral-soft); color: var(--neutral); }
+.badge.tone-warning { background: var(--warning-soft); color: var(--warning); }
+.badge.tone-danger { background: var(--danger-soft); color: var(--danger); }
+.badge.tone-info { background: var(--info-soft); color: var(--info); }
+.badge.tone-success { background: var(--success-soft); color: var(--success); }
 .badge.tone-neutral { background: var(--neutral-soft); color: var(--neutral); }
 .badge.tone-warning { background: var(--warning-soft); color: var(--warning); }
 .badge.tone-danger { background: var(--danger-soft); color: var(--danger); }
@@ -623,30 +639,33 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 
 /* Recharts tooltip：反色实心块（浅色下深底白字），不是带描边的浅色卡片。
    反色让它从图表平面里「浮」出来，不必靠阴影和描边堆重量。 */
+/* Recharts tooltip：毛玻璃浮层（承接新设计语言），高对比数值 + 色板 swatch */
 .chart-tooltip {
-  background: var(--text-1);
-  color: var(--bg-surface);
+  background: var(--bar-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  padding: var(--s2-5) var(--s3);
-  font-size: var(--fs-3);
-  line-height: 1.25rem;
-  opacity: 0.95;
+  padding: var(--s2-5) var(--s3-5);
   box-shadow: var(--shadow-pop);
+  font-size: var(--fs-2);
+  line-height: 1.4;
+  color: var(--text-1);
 }
-.chart-tooltip .tt-label { opacity: 0.62; margin-bottom: var(--s1); }
+.chart-tooltip .tt-label { color: var(--text-2); font-weight: var(--fw-medium); margin-bottom: var(--s1); }
 .chart-tooltip .tt-row { display: flex; align-items: center; gap: var(--s1-5); }
 .chart-tooltip .tt-swatch { width: var(--s2); height: var(--s2); border-radius: var(--radius-xs); flex: none; }
 
 /* ---- 口径徽标 ---- */
 .caliber {
-  display: inline-flex; align-items: center; gap: 3px;
+  display: inline-flex; align-items: center; gap: var(--s1);
   font-size: var(--fs-1);
   font-weight: var(--fw-semi);
-  padding: 1px var(--s1-5);
-  border-radius: var(--radius-xs);
-  background: var(--neutral-soft);
-  color: var(--text-2);
-  letter-spacing: 0.02em;
+  padding: 2px var(--s2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
@@ -658,6 +677,11 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: var(--s4);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.review-card.bad {
+  border-left: 3px solid var(--danger);
+  background: linear-gradient(90deg, var(--danger-soft) 0%, var(--bg-surface) 25%);
 }
 .review-card .meta {
   display: flex; gap: var(--s2); align-items: center;
@@ -983,26 +1007,44 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
     display: flex;
     align-items: center;
     gap: var(--s2-5);
-    padding: var(--s1-5) var(--s3) var(--s5);
-    font-size: var(--fs-5);
-    font-weight: var(--fw-bold);
+    padding: var(--s2) var(--s3) var(--s5);
+    font-size: var(--fs-6);
+    font-weight: 750;
     color: var(--text-1);
+    letter-spacing: -0.02em;
   }
-  .tabbar-brand svg { color: var(--accent); }
+  .tabbar-brand .brand-icon-box {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-control);
+    background: linear-gradient(135deg, var(--accent-grad-top), var(--accent-grad-bottom));
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    box-shadow: 0 4px 12px light-dark(rgba(79, 70, 229, 0.25), rgba(99, 102, 241, 0.35));
+    flex: none;
+  }
   .tabbar a {
-    flex: none; /* 重置移动端等宽 flex:1，侧边栏是纵向按内容高度排列 */
+    flex: none;
     flex-direction: row;
     justify-content: flex-start;
     gap: var(--s3);
     width: 100%;
     font-size: var(--fs-4);
-    padding: var(--s2) var(--s3);
+    font-weight: var(--fw-medium);
+    padding: var(--s2-5) var(--s3);
     min-height: 0;
     border-radius: var(--radius-control);
     color: var(--text-2);
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
   }
-  .tabbar a svg { width: 18px; height: 18px; }
-  .tabbar a.active { background: var(--accent-soft); color: var(--accent-text); }
+  .tabbar a svg { width: 18px; height: 18px; flex: none; }
+  .tabbar a.active {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: var(--fw-semi);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+  }
   .tabbar .tab-item { display: block; width: 100%; }
   .tab-slider { display: none; } /* 选中滑块仅移动端底栏 */
 
@@ -1111,3 +1153,302 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 }
 
 @keyframes sheet-pop { from { transform: translate(-50%, -48%); opacity: 0; } }
+
+
+/* ============================================================
+   “指挥中心” 增强层 —— 追加到 web/src/styles/components.css 末尾
+   （或作为单独文件在 components.css 之后 import）
+
+   全部基于你现有的 class 结构（.shell / .stat-card.hero / .alert-card /
+   .group-label / .overview-grid / .chart-frame …），组件 TSX 零改动即可生效。
+   仅两处“可选”结构增强需在 JSX 加一个 class，见文末注释与 README。
+   ============================================================ */
+
+/* ① 页面背景极光 —— 让首屏不再是纯平底色，指挥中心氛围的关键一笔。
+   两层 radial + 固定附着；浅色下极淡、暗色下品牌辉光。 */
+body {
+  background:
+    radial-gradient(1200px 600px at 78% -8%, var(--glow-1), transparent 60%),
+    radial-gradient(900px 520px at -6% 4%, var(--glow-2), transparent 55%),
+    var(--bg-app);
+  background-attachment: fixed;
+}
+
+/* ② hero KPI 卡 —— 更强的视觉焦点：品牌渐变 + 发光投影 + 巨字号。
+   覆盖你现有 .stat-card.hero（同名，权重相同，靠后声明胜出）。 */
+.stat-card.hero {
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg,
+      light-dark(rgba(79, 70, 229, 0.10), rgba(99, 102, 241, 0.16)),
+      light-dark(rgba(6, 182, 212, 0.03), rgba(34, 211, 238, 0.05)) 55%,
+      var(--bg-surface));
+  box-shadow: var(--shadow-card);
+}
+.stat-card.hero .value {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-black);
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+/* ③ KPI 卡在暗色下的额外景深（浅色下由 --shadow-card 已足够） */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .stat-card {
+    box-shadow: var(--shadow-card), 0 12px 28px -14px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* ④ 模块分组分隔线 —— 解决“看不出模块边界”。
+   用法：<div class="group-label divider"><span>实时监控</span></div>
+   纯文字后跟一条贯穿到底的发丝线，清晰切分「实时监控 / 健康度与口碑」等区块。 */
+.group-label.divider {
+  align-items: center;
+  gap: var(--s3);
+  margin: var(--s7) 0 var(--s4);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.group-label.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--hair);
+}
+
+/* ⑤ 各 Section 头部与卡片框统一：给 chart-frame / list / panel 一致的描边+发丝。
+   （这些类你已有；此处只补暗色下 1px 内高光缺失的观感，安全叠加。） */
+.chart-frame, .list, .panel, .stat-card {
+  border: 1px solid var(--border-subtle);
+}
+
+/* ⑥ 顶栏毛玻璃随新 --bar-bg 自动更新，无需改动。 */
+
+
+/* ============================================================
+   指挥中心结构模块（订阅健康环形 / 评分分布摘要 / 转化漏斗）
+   ============================================================ */
+
+/* ---- 订阅健康环形卡 ---- */
+.health-card { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+.health-card .donut-center { display: flex; flex-direction: column; align-items: center; }
+.health-card .dc-value { font-size: var(--fs-8); font-weight: var(--fw-heavy); letter-spacing: -0.02em; color: var(--text-1); line-height: 1; }
+.health-card .dc-label { font-size: var(--fs-2); color: var(--text-3); margin-top: 3px; }
+.health-legend { list-style: none; flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: var(--s2-5); }
+.health-legend li { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-3); }
+.health-legend .hl-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.health-legend .hl-label { color: var(--text-2); }
+.health-legend .hl-value { margin-left: auto; font-weight: var(--fw-semi); color: var(--text-1); }
+.health-legend .hl-pct { color: var(--text-3); min-width: 36px; text-align: right; }
+
+/* ---- 评分分布摘要头（均分 + 星 + 样本量） ---- */
+.rating-summary { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.rating-summary .rs-avg { font-size: var(--fs-8); font-weight: var(--fw-heavy); letter-spacing: -0.02em; color: var(--star); line-height: 1; }
+.rating-summary .rs-total { margin-left: auto; font-size: var(--fs-2); color: var(--text-3); }
+
+/* ---- 转化漏斗行卡（浏览→下载→试用→付费） ---- */
+.funnel { display: flex; flex-direction: column; gap: var(--s2-5); }
+.funnel-row {
+  display: flex; align-items: center; gap: var(--s3-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--s3-5) var(--s4);
+}
+.funnel-row .funnel-ic { width: 34px; height: 34px; border-radius: var(--radius-control); display: grid; place-items: center; flex: none; }
+.funnel-row .funnel-main { flex: 1; min-width: 0; }
+.funnel-row .funnel-label { font-size: var(--fs-2); color: var(--text-3); white-space: nowrap; }
+.funnel-row .funnel-value { font-size: var(--fs-7); font-weight: var(--fw-heavy); color: var(--text-1); letter-spacing: -0.01em; }
+.funnel-row .funnel-delta { font-size: var(--fs-2); font-weight: var(--fw-semi); flex: none; }
+.funnel-row .funnel-delta.up { color: var(--success); }
+.funnel-row .funnel-delta.down { color: var(--danger); }
+
+/* ---- 收入来源占比堆叠条 ---- */
+.compo-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s2); }
+.compo-head .total { font-size: var(--fs-7); font-weight: var(--fw-bold); letter-spacing: -0.02em; }
+.compo-head .label { font-size: var(--fs-2); color: var(--text-3); }
+.compo-bar {
+  display: flex; height: 12px; border-radius: var(--radius-pill);
+  overflow: hidden; background: var(--bg-inset); margin-bottom: var(--s3-5);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.compo-bar .compo-seg { height: 100%; min-width: 2px; }
+.compo-bar .compo-seg + .compo-seg { border-left: 1.5px solid var(--bg-surface); }
+
+
+/* ============================================================
+   指挥中心 HERO 大卡 + KPI STRIP（对齐 总览指挥中心.dc.html）
+   ============================================================ */
+
+/* 通用图标片（原 .stat-ic tone 只在 .stat-card 内生效；这里放开给 hero/kpi/funnel 复用） */
+.cmd-hero .stat-ic, .kpi-card .stat-ic, .funnel-row .stat-ic {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.cmd-hero .stat-ic { width: 34px; height: 34px; }
+.kpi-card .stat-ic { width: 30px; height: 30px; }
+.stat-ic.tone-accent  { background: var(--accent-soft);  color: var(--accent-text); }
+.stat-ic.tone-success { background: var(--success-soft); color: var(--success-icon); }
+.stat-ic.tone-danger  { background: var(--danger-soft);  color: var(--danger-icon); }
+.stat-ic.tone-info    { background: var(--info-soft);    color: var(--info-icon); }
+.stat-ic.tone-violet  { background: var(--violet-soft);  color: var(--violet-icon); }
+.stat-ic.tone-teal    { background: var(--teal-soft);    color: var(--teal-icon); }
+.stat-ic.tone-star    { background: light-dark(rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.18)); color: var(--star); }
+
+/* ---- HERO ---- */
+.cmd-hero {
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(135deg,
+      light-dark(rgba(99, 102, 241, 0.10), rgba(99, 102, 241, 0.16)),
+      light-dark(rgba(34, 211, 238, 0.03), rgba(34, 211, 238, 0.05)) 55%,
+      var(--bg-surface));
+  box-shadow: var(--shadow-card);
+  display: grid; grid-template-columns: 1fr;
+}
+.ch-main { position: relative; padding: var(--s5) var(--s5) var(--s5); display: flex; flex-direction: column; }
+.ch-head { display: flex; align-items: center; gap: var(--s2-5); flex-wrap: wrap; }
+.ch-label { font-size: var(--fs-3); font-weight: var(--fw-semi); color: var(--text-2); letter-spacing: 0.02em; }
+.ch-delta { display: inline-flex; align-items: center; gap: 4px; padding: 3px var(--s2-5); border-radius: var(--radius-pill); font-size: var(--fs-2); font-weight: var(--fw-bold); white-space: nowrap; }
+.ch-delta.up { color: var(--success); background: var(--success-soft); }
+.ch-delta.down { color: var(--danger); background: var(--danger-soft); }
+.ch-value { font-size: clamp(40px, 5.4vw, 64px); font-weight: var(--fw-black); letter-spacing: -0.035em; line-height: 1.02; margin: var(--s3) 0 var(--s1); color: var(--text-1); }
+.ch-foots { display: flex; gap: var(--s4); flex-wrap: wrap; margin-top: var(--s1); }
+.ch-foots span { font-size: var(--fs-3); color: var(--text-2); }
+.ch-foots b { color: var(--text-1); font-weight: var(--fw-bold); }
+.ch-foots b.neg { color: var(--danger); }
+.ch-actions { margin-top: var(--s4); display: flex; gap: var(--s2-5); flex-wrap: wrap; }
+.ch-actions .primary { min-height: 0; padding: var(--s2) var(--s4); font-size: var(--fs-3); border-radius: var(--radius-pill); }
+.ch-chart { position: relative; padding: var(--s4) var(--s5) var(--s4); display: flex; flex-direction: column; border-top: 1px solid var(--hair); }
+.ch-chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--s1-5); font-size: var(--fs-2); }
+.ch-chart-head > span:first-child { font-weight: var(--fw-semi); color: var(--text-2); }
+.ch-chart-head .cc-total { color: var(--text-3); }
+.ch-chart-head .cc-total b { color: var(--text-1); }
+.ch-chart-body { flex: 1; min-height: 160px; }
+@media (min-width: 768px) {
+  .cmd-hero { grid-template-columns: minmax(280px, 1fr) 1.1fr; gap: var(--s2); }
+  .ch-main { padding: var(--s6) var(--s7); }
+  .ch-chart { border-top: none; padding: var(--s5) var(--s6) var(--s4); }
+  .ch-chart-body { min-height: 172px; }
+}
+
+/* ---- KPI STRIP ---- */
+.kpi-strip { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3-5); }
+@media (min-width: 768px) { .kpi-strip { grid-template-columns: repeat(4, 1fr); } }
+.kpi-card {
+  text-align: left; background: var(--bg-surface);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); padding: var(--s4);
+  display: flex; flex-direction: column; gap: var(--s2); min-width: 0;
+  font-family: inherit; color: inherit;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+button.kpi-card { cursor: pointer; }
+.kpi-card .kc-head { display: flex; align-items: center; gap: var(--s2); }
+.kpi-card .kc-label { font-size: var(--fs-2); font-weight: var(--fw-semi); color: var(--text-2); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-card .kc-delta { flex: none; font-size: var(--fs-1); font-weight: var(--fw-bold); padding: 2px var(--s2); border-radius: var(--radius-pill); white-space: nowrap; }
+.kpi-card .kc-delta.up { color: var(--success); background: var(--success-soft); }
+.kpi-card .kc-delta.down { color: var(--danger); background: var(--danger-soft); }
+.kpi-card .kc-badge { flex: none; }
+.kpi-card .kc-value { font-size: var(--fs-9); font-weight: var(--fw-heavy); letter-spacing: -0.02em; line-height: 1.1; color: var(--text-1); }
+.kpi-card .kc-spark { height: 34px; margin: 0 -2px; }
+.kpi-card .kc-spark .spark-line { stroke: currentColor; stroke-width: 2px; }
+.kpi-card .kc-spark.tone-violet { color: var(--violet-icon); }
+.kpi-card .kc-spark.tone-accent { color: var(--accent); }
+.kpi-card .kc-spark.tone-teal { color: var(--teal-icon); }
+.kpi-card .kc-spark.tone-star { color: var(--star); }
+.kpi-card .kc-foot { font-size: var(--fs-1); color: var(--text-3); }
+@media (hover: hover) and (pointer: fine) {
+  button.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+}
+
+/* 移动端（overview-grid 非 grid）：hero / KPI 条 / 告警卡的垂直间距 */
+@media (max-width: 1023px) {
+  .overview-grid > .cmd-hero,
+  .overview-grid > .kpi-strip,
+  .overview-grid > .alert-card { margin-top: var(--s4); }
+}
+
+
+/* ============================================================
+   收入分析页（对齐 收入分析.dc.html）
+   ============================================================ */
+/* Hero 左列 3 小数 */
+.rev-hero .ch-chart-head { align-items: center; }
+.rev-mini { display: flex; gap: var(--s5); margin-top: var(--s4); flex-wrap: wrap; }
+.rev-mini .rm-k { font-size: var(--fs-2); color: var(--text-3); }
+.rev-mini .rm-v { font-size: var(--fs-6); font-weight: var(--fw-bold); color: var(--text-1); letter-spacing: -0.01em; margin-top: 2px; }
+.rev-ranges .segmented { background: var(--bg-inset); }
+
+/* 收入构成：stacked 图例 + donut 占比 */
+.compo-legend-inline { display: flex; gap: var(--s3); margin-bottom: var(--s3); flex-wrap: wrap; font-size: var(--fs-2); color: var(--text-2); }
+.compo-legend-inline > span { display: inline-flex; align-items: center; gap: var(--s1-5); }
+.compo-legend-inline .cli-dot { width: 9px; height: 9px; border-radius: 3px; }
+.compo-donut { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+.health-legend .hl-label { flex: 1; min-width: 0; }
+
+/* 对账明细行值 + 按产品列表 */
+.recon-row > .num { font-weight: var(--fw-semi); color: var(--text-1); }
+.recon-row > .num.pos { color: var(--success); }
+.recon-row > .num.neg { color: var(--danger); }
+.prod-list { list-style: none; display: flex; flex-direction: column; gap: var(--s2-5); }
+.prod-list li { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-3); }
+.prod-list .pl-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.prod-list .pl-name { flex: 1; min-width: 0; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prod-list .pl-val { font-weight: var(--fw-semi); color: var(--text-1); }
+.prod-list .pl-pct { color: var(--text-3); min-width: 40px; text-align: right; }
+
+
+/* ---- 评论评分页：评分总览 3 列 hero（对齐 评论评分.dc.html）---- */
+.rating-overview { display: grid; grid-template-columns: 1fr; gap: var(--s4); }
+@media (min-width: 768px) {
+  .rating-overview { grid-template-columns: minmax(130px, 0.75fr) 1.15fr 1.15fr; gap: var(--s5); align-items: start; }
+  .rating-overview > * + * { border-left: 1px solid var(--hair); padding-left: var(--s5); }
+}
+.ro-avg { display: flex; flex-direction: column; gap: var(--s1-5); }
+.ro-avg-num { display: flex; align-items: baseline; gap: var(--s1); }
+.ro-avg-num .num { font-size: var(--fs-11); font-weight: var(--fw-black); letter-spacing: -0.03em; color: var(--star); line-height: 1; }
+.ro-avg .ro-slash { font-size: var(--fs-5); color: var(--text-3); }
+.ro-avg .stars { font-size: var(--fs-6); }
+.ro-avg-sub { font-size: var(--fs-2); color: var(--text-2); }
+.ro-col-title { font-size: var(--fs-2); font-weight: var(--fw-semi); color: var(--text-3); margin-bottom: var(--s3); letter-spacing: 0.04em; }
+.ro-trend .country-ratings { margin-top: var(--s3); }
+
+
+/* ---- 实时动态页：今日汇总条（对齐 实时动态.dc.html）---- */
+.act-summary {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1px; background: var(--border-subtle);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
+  overflow: hidden; margin-bottom: var(--s3); box-shadow: var(--shadow-card);
+}
+@media (min-width: 560px) { .act-summary { grid-template-columns: repeat(4, 1fr); } }
+.act-summary .as-cell { background: var(--bg-surface); padding: var(--s3) var(--s3-5); display: flex; flex-direction: column; gap: var(--s1-5); }
+.act-summary .as-head { display: flex; align-items: center; gap: var(--s1-5); font-size: var(--fs-2); color: var(--text-2); }
+.act-summary .stat-ic { width: 24px; height: 24px; }
+.act-summary .as-value { font-size: var(--fs-6); font-weight: var(--fw-bold); color: var(--text-1); letter-spacing: -0.01em; }
+
+
+/* ---- 设置页：数据管道状态卡（对齐 设置.dc.html）---- */
+.pipe-card {
+  display: flex; align-items: center; gap: var(--s3-5);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+  padding: var(--s4); margin-bottom: var(--s5); flex-wrap: wrap;
+}
+.pipe-card .pipe-ic { width: 40px; height: 40px; border-radius: var(--radius-control); display: grid; place-items: center; flex: none; }
+.pipe-card .pipe-ic.ok { background: var(--success-soft); color: var(--success-icon); }
+.pipe-card .pipe-ic.warn { background: var(--warning-soft); color: var(--warning-icon); }
+.pipe-card .pipe-main { flex: 1; min-width: 150px; }
+.pipe-card .pipe-title { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-5); font-weight: var(--fw-semi); color: var(--text-1); }
+.pipe-card .pipe-sub { font-size: var(--fs-2); color: var(--text-3); margin-top: 2px; }
+.pipe-card .pipe-stats { display: flex; gap: var(--s5); flex: none; }
+.pipe-card .pipe-stats .ps-v { font-size: var(--fs-7); font-weight: var(--fw-bold); color: var(--text-1); letter-spacing: -0.01em; text-align: right; }
+.pipe-card .pipe-stats .ps-k { font-size: var(--fs-1); color: var(--text-3); text-align: right; }

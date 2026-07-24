@@ -3,13 +3,41 @@
 
 import { useState } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { api, type ActivityItem, type DayTotal } from '../lib/api'
+import { api, type ActivityItem, type DayTotal, type Overview } from '../lib/api'
 import { useAppFilter, withAppParam } from '../lib/app-filter'
 import { dayKey, dayLabel } from '../lib/format'
 import { fmtUsd } from '../lib/money'
 import { ActivityRow } from '../components/ActivityRow'
+import { Icon, type IconName } from '../components/Icon'
 import { SubPage } from '../components/SubPage'
 import { EmptyState, FilterChips, LoadMore, Skeleton } from '../components/ui'
+
+/** 今日汇总条（对齐 实时动态.dc.html）：今日收入 / 新订 / 续费 / 退款 */
+function TodaySummary() {
+  const appId = useAppFilter()
+  const { data: o } = useQuery({
+    queryKey: ['overview', appId],
+    queryFn: () => api<Overview>(withAppParam('/api/overview', appId)),
+    refetchInterval: 60_000,
+  })
+  if (!o) return null
+  const cells: Array<{ icon: IconName; tone: string; label: string; value: string }> = [
+    { icon: 'dollar', tone: 'success', label: '今日收入', value: fmtUsd(o.todayRevenueUsdMilli) },
+    { icon: 'zap', tone: 'accent', label: '新订', value: String(o.todayNewSubs) },
+    { icon: 'refresh', tone: 'info', label: '续费', value: String(o.todayRenewals) },
+    { icon: 'trendingDown', tone: 'danger', label: '退款', value: String(o.todayRefunds) },
+  ]
+  return (
+    <div className="act-summary">
+      {cells.map((c) => (
+        <div className="as-cell" key={c.label}>
+          <div className="as-head"><span className={`stat-ic tone-${c.tone}`}><Icon name={c.icon} size={14} /></span>{c.label}</div>
+          <div className="as-value num">{c.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const KIND_FILTERS = [
   { key: 'revenue', label: '收入' },
@@ -68,6 +96,7 @@ export function ActivityPage() {
 
   return (
     <SubPage title="实时动态" backTo="/" backLabel="返回总览" width="narrow-lg">
+      <TodaySummary />
       <div className="hstack-center">
         <FilterChips scroll multiple label="事件类型" items={KIND_FILTERS} active={kinds} onToggle={toggleKind} />
         <button
@@ -96,6 +125,7 @@ export function ActivityPage() {
             <div className="day-group" key={g.key}>
               <div className="group-label">
                 <span>{g.label}</span>
+                <span className="count">{g.items.length} 条</span>
                 {total && (
                   <span
                     className={`day-total num${total.usdMilli < 0 ? ' neg' : ''}`}

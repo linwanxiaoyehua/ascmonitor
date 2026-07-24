@@ -6,16 +6,19 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocation } from 'wouter'
 import {
   api, type ActivityItem, type AppOverviewRow, type MetricsDaily, type Overview,
-  type Reconciliation, type Review, type SalesDaily,
+  type RatingDistribution, type Reconciliation, type Review, type SalesDaily,
 } from '../lib/api'
 import { useAppFilter, withAppParam } from '../lib/app-filter'
 import { applyCaliber, effectiveCaliber, useCaliber } from '../lib/caliber'
 import { fmtUsd, fmtUsdCompact } from '../lib/money'
 import { ActivityRow } from '../components/ActivityRow'
 import { AppIcon } from '../components/AppIcon'
+import { Donut } from '../components/Donut'
+import { DistributionBars } from '../components/DistributionBars'
 import { Icon, Stars } from '../components/Icon'
+import { KpiCard } from '../components/Kpi'
 import { TrendChart } from '../components/TrendChart'
-import { CaliberTag, EmptyState, ErrorState, PageHeader, Section, Skeleton, StatCard } from '../components/ui'
+import { CaliberTag, EmptyState, ErrorState, PageHeader, Section, Skeleton } from '../components/ui'
 
 function yesterdayStr(): string {
   return new Date(Date.now() - 86400_000).toISOString().slice(0, 10)
@@ -43,6 +46,70 @@ function MultiAppOverview() {
             </div>
           </button>
         ))}
+      </div>
+    </Section>
+  )
+}
+
+/** 订阅健康环形：活跃订阅按「正常续费 / 试用中 / 流失风险」拆分 */
+function SubHealthCard({ o }: { o: Overview }) {
+  const total = o.activeSubs
+  const trial = o.trialSubs
+  const risk = o.riskSubs
+  const normal = Math.max(0, total - trial - risk)
+  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0)
+  const segs = [
+    { label: '正常续费', value: normal, color: 'var(--chart-2)' },
+    { label: '试用中', value: trial, color: 'var(--chart-3)' },
+    { label: '流失风险', value: risk, color: 'var(--warning-icon)' },
+  ]
+  return (
+    <div className="panel pad health-card">
+      <Donut segments={segs} size={148} thickness={16} gap={3}>
+        <span className="donut-center">
+          <span className="dc-value num">{total.toLocaleString()}</span>
+          <span className="dc-label">活跃订阅</span>
+        </span>
+      </Donut>
+      <ul className="health-legend">
+        {segs.map((s) => (
+          <li key={s.label}>
+            <span className="hl-dot" style={{ background: s.color }} />
+            <span className="hl-label">{s.label}</span>
+            <span className="hl-value num">{s.value.toLocaleString()}</span>
+            <span className="hl-pct num">{pct(s.value)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** 评分分布（近 90 天文字评论样本）——总览精简版：均分 + 分布条 */
+function RatingDistCard({ appId, onOpen }: { appId: number | null; onOpen: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['rating-dist', appId],
+    queryFn: () => api<RatingDistribution>(withAppParam('/api/reviews/distribution?days=90', appId)),
+  })
+  if (!data || data.total === 0) return null
+  const avg = data.distribution.reduce((s, d) => s + d.rating * d.count, 0) / data.total
+  return (
+    <Section title="评分分布" action={{ label: '评论评分', onPress: onOpen }}>
+      <div className="panel pad">
+        <div className="rating-summary">
+          <span className="rs-avg num">{avg.toFixed(1)}</span>
+          <Stars rating={Math.round(avg)} />
+          <span className="rs-total num">{data.total.toLocaleString()} 条</span>
+        </div>
+        <DistributionBars
+          variant="rating"
+          data={data.distribution.map((d) => ({
+            key: String(d.rating),
+            label: `${d.rating} ★`,
+            value: d.count,
+            display: `${d.count} · ${Math.round((d.count / data.total) * 100)}%`,
+          }))}
+        />
       </div>
     </Section>
   )
@@ -81,6 +148,11 @@ export function OverviewPage() {
     enabled: caliber !== 'gross',
   })
   const rate = reconQ.data?.summary.proceedsRate ?? 0.85
+  // 平均评分 KPI（页级取分布，与下方「评分分布」卡共享 react-query 缓存，仅一次请求）
+  const distQ = useQuery({
+    queryKey: ['rating-dist', appId],
+    queryFn: () => api<RatingDistribution>(withAppParam('/api/reviews/distribution?days=90', appId)),
+  })
 
   const o = overviewQ.data
 
@@ -90,6 +162,7 @@ export function OverviewPage() {
   const subsSource = snapshotFresh ? `ASC · ${o!.snapshot!.date.slice(5)}` : '实时'
 
   const todayCaliber = effectiveCaliber(caliber, false)
+  const calLabel = ({ net: '净额', gross: '流水', billed: '账单' } as Record<string, string>)[todayCaliber] ?? '净额'
   const todayRevenue = o ? applyCaliber(o.todayRevenueUsdMilli, todayCaliber, rate) : 0
 
   // 本月收入（月至今）：从 30 天 metrics 过滤当月即可——月最长 31 天，30 天窗口从每月 31 号
@@ -120,6 +193,27 @@ export function OverviewPage() {
   const downloads30 = (salesQ.data ?? []).reduce((s, d) => s + d.downloads, 0)
   const badReview = badReviewQ.data?.reviews[0]
 
+  // KPI sparkline 序列：按日聚合 30 天 metrics（多 App 合并）
+  const dailyAgg = new Map<string, { mrr: number; active: number }>()
+  for (const d of metricsQ.data ?? []) {
+    const a = dailyAgg.get(d.date) ?? { mrr: 0, active: 0 }
+    a.mrr += d.mrr_milli
+    a.active += d.active_subs
+    dailyAgg.set(d.date, a)
+  }
+  const aggDates = [...dailyAgg.keys()].sort()
+  const mrrSeries = aggDates.map((dt) => dailyAgg.get(dt)!.mrr)
+  const activeSeries = aggDates.map((dt) => dailyAgg.get(dt)!.active)
+  const revSeries = trendData.map((d) => d.value)
+  const mrrDelta =
+    mrrSeries.length > 1 && mrrSeries[0] > 0
+      ? ((mrrSeries[mrrSeries.length - 1] - mrrSeries[0]) / mrrSeries[0]) * 100
+      : null
+  const ratingAvg =
+    distQ.data && distQ.data.total > 0
+      ? distQ.data.distribution.reduce((s, d) => s + d.rating * d.count, 0) / distQ.data.total
+      : null
+
   if (overviewQ.isError) {
     return (
       <>
@@ -133,49 +227,84 @@ export function OverviewPage() {
     <div className="overview-grid">
       <PageHeader title="总览" />
 
-      {/* KPI：今日收入 / MRR / 活跃订阅 / 试用中 —— 每张卡通向它自己的下钻页，不重复指向同一处 */}
-      <div className="stat-grid kpi span-full">
-        {/* 今日收入是每天最先看的数 —— 桌面占半幅，配 30 天趋势缩略。
-            sparkline 直接复用下方收入趋势的同一份数据，口径切换时两者同步变化 */}
-        <StatCard
-          hero
-          tone="success"
-          spark={trendData.map((d) => d.value)}
-          loading={overviewQ.isPending}
-          icon="dollar"
-          label="今日收入"
-          value={o ? fmtUsd(todayRevenue) : ''}
-          delta={todayDelta != null ? { text: `${Math.abs(todayDelta).toFixed(0)}% vs 昨日`, direction: todayDelta >= 0 ? 'up' : 'down' } : undefined}
-          foot={o ? `新订 ${o.todayNewSubs} · 续费 ${o.todayRenewals} · 退款 ${o.todayRefunds}` : undefined}
-          onPress={() => navigate('/revenue')}
-        />
-        <StatCard
-          loading={metricsQ.isPending}
-          icon="chart"
-          tone="accent"
-          label="本月收入"
+      {/* ═══ HERO：今日收入大卡 + 30 天趋势（对齐设计稿指挥中心 HERO）═══ */}
+      {overviewQ.isPending || !o ? (
+        <div className="skeleton h-hero span-full" aria-hidden="true" />
+      ) : (
+        <section className="cmd-hero span-full">
+          <div className="ch-main">
+            <div className="ch-head">
+              <span className="stat-ic tone-success"><Icon name="dollar" size={17} /></span>
+              <span className="ch-label">今日收入 · {calLabel}</span>
+              {todayDelta != null && (
+                <span className={`ch-delta ${todayDelta >= 0 ? 'up' : 'down'}`}>
+                  {todayDelta >= 0 ? '↑' : '↓'} {Math.abs(todayDelta).toFixed(0)}% vs 昨日
+                </span>
+              )}
+            </div>
+            <div className="ch-value num">{fmtUsd(todayRevenue)}</div>
+            <div className="ch-foots">
+              <span><b>{o.todayNewSubs}</b> 新订</span>
+              <span><b>{o.todayRenewals}</b> 续费</span>
+              <span><b className="neg">{o.todayRefunds}</b> 退款</span>
+            </div>
+            <div className="ch-actions">
+              <button className="primary" onClick={() => navigate('/revenue')}>收入分析 →</button>
+            </div>
+          </div>
+          <div className="ch-chart">
+            <div className="ch-chart-head">
+              <span>近 30 天收入趋势</span>
+              <span className="cc-total">合计 <b className="num">{fmtUsd(trendTotal)}</b></span>
+            </div>
+            <div className="ch-chart-body">
+              {metricsQ.isPending ? (
+                <Skeleton variant="chart" height={172} />
+              ) : (
+                <TrendChart
+                  type="area"
+                  data={trendData}
+                  series={[{ key: 'value', name: '收入', color: 'var(--chart-2)' }]}
+                  format={fmtUsd}
+                  axisFormat={fmtUsdCompact}
+                  height={172}
+                />
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ═══ KPI STRIP：本月收入 / MRR / 活跃订阅 / 平均评分 ═══ */}
+      <div className="kpi-strip span-full">
+        <KpiCard
+          icon="chart" tone="violet" label="本月收入"
           value={fmtUsd(monthRevenue)}
           foot={`新订 ${monthSum((d) => d.new_subs)} · 续费 ${monthSum((d) => d.renewals)}`}
+          spark={revSeries}
           onPress={() => navigate('/revenue')}
         />
-        <StatCard
-          loading={overviewQ.isPending}
-          icon="trendingUp"
-          tone="violet"
-          label="MRR"
-          value={o ? fmtUsd(o.mrrUsdMilli) : ''}
+        <KpiCard
+          icon="trendingUp" tone="accent" label="MRR"
+          value={o ? fmtUsd(o.mrrUsdMilli) : '—'}
+          delta={mrrDelta != null ? { text: `${Math.abs(mrrDelta).toFixed(1)}%`, direction: mrrDelta >= 0 ? 'up' : 'down' } : undefined}
           foot={o ? `ARR ${fmtUsd(o.mrrUsdMilli * 12)}` : undefined}
+          spark={mrrSeries}
           onPress={() => navigate('/revenue/health')}
         />
-        <StatCard
-          loading={overviewQ.isPending}
-          icon="users"
-          tone="teal"
-          label="活跃订阅"
-          badge={<CaliberTag>{subsSource}</CaliberTag>}
+        <KpiCard
+          icon="users" tone="teal" label="活跃订阅"
           value={String(activeValue)}
-          foot={o && o.riskSubs > 0 ? `流失风险 ${o.riskSubs} · 已关续费 ${o.autoRenewOffCount}` : o ? `已关续费 ${o.autoRenewOffCount}` : undefined}
+          badge={<CaliberTag>{subsSource}</CaliberTag>}
+          foot={o ? `试用 ${o.trialSubs} · 风险 ${o.riskSubs}` : undefined}
+          spark={activeSeries}
           onPress={() => navigate('/revenue/detail')}
+        />
+        <KpiCard
+          icon="star" tone="star" label="平均评分"
+          value={ratingAvg != null ? ratingAvg.toFixed(1) : '—'}
+          foot={`近 90 天 ${distQ.data?.total ?? 0} 条评论`}
+          onPress={() => navigate('/reviews')}
         />
       </div>
 
@@ -190,6 +319,9 @@ export function OverviewPage() {
           <Icon name="chevronRight" size={18} />
         </button>
       )}
+
+      {/* ===== 实时监控 ===== */}
+      <div className="group-label divider span-full"><span>实时监控</span></div>
 
       {/* 实时动态流（桌面左列，指挥中心主视觉） */}
       <Section title="实时动态" action={{ label: '查看全部', onPress: () => navigate('/activity') }}>
@@ -247,6 +379,23 @@ export function OverviewPage() {
             </div>
           </Section>
         )}
+      </div>
+
+      {/* ===== 健康度与口碑 ===== */}
+      <div className="group-label divider span-full"><span>健康度与口碑</span></div>
+
+      {/* 订阅健康环形（桌面左列） */}
+      <Section title="订阅健康" action={{ label: '订阅明细', onPress: () => navigate('/revenue/detail') }}>
+        {overviewQ.isPending || !o ? (
+          <Skeleton variant="chart" height={196} />
+        ) : (
+          <SubHealthCard o={o} />
+        )}
+      </Section>
+
+      {/* 评分分布（桌面右列） */}
+      <div className="col-stack">
+        <RatingDistCard appId={appId} onOpen={() => navigate('/reviews')} />
       </div>
 
       {/* 多 App 分列概览（全部 Apps 模式） */}

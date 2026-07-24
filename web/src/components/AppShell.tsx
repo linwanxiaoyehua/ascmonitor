@@ -189,7 +189,9 @@ function NavTree({ location }: { location: string }) {
       {/* 移动端选中高亮滑块（桌面 ≥1024 隐藏）；切/拖 tab 时 translateX 平移形成滑动动画 */}
       <span className="tab-slider" aria-hidden="true" />
       <div className="tabbar-brand" aria-hidden="true">
-        <Icon name="chart" size={22} />
+        <span className="brand-icon-box">
+          <Icon name="chart" size={18} />
+        </span>
         <span>ASCMonitor</span>
       </div>
       {TABS.map((t, i) => {

@@ -8,10 +8,40 @@
 
 import { useState } from 'react'
 import { useLocation, useParams } from 'wouter'
+import { useQuery } from '@tanstack/react-query'
+import { api, type AppRow, type DataHealth } from '../../lib/api'
+import { timeAgo } from '../../lib/format'
 import { SETTINGS_SUBS } from '../../lib/nav'
 import { getTheme, setTheme, type Theme } from '../../lib/theme'
 import { Icon } from '../../components/Icon'
 import { ListRow, PageHeader, Section, SegmentedControl } from '../../components/ui'
+
+/** 数据管道状态卡（对齐 设置.dc.html 顶部）：管道健康 + 接入 App / 原始事件 */
+function DataPipelineCard() {
+  const { data: health } = useQuery({ queryKey: ['data-health'], queryFn: () => api<DataHealth>('/api/health/data') })
+  const { data: apps } = useQuery({ queryKey: ['apps'], queryFn: () => api<AppRow[]>('/api/apps') })
+  if (!health) return null
+  const fresh = health.lastWebhookAt != null && Date.now() - health.lastWebhookAt < 24 * 3600 * 1000
+  return (
+    <div className="pipe-card">
+      <span className={`pipe-ic ${fresh ? 'ok' : 'warn'}`}><Icon name="activity" size={20} /></span>
+      <div className="pipe-main">
+        <div className="pipe-title">
+          {fresh ? '数据管道运行正常' : '数据管道待接入'}
+          <span className={`fresh-dot ${fresh ? 'ok' : 'stale'}`} />
+        </div>
+        <div className="pipe-sub">
+          {health.lastWebhookAt ? `最近事件 ${timeAgo(health.lastWebhookAt)}` : '尚未收到 Webhook 事件'}
+          {health.fxUpdatedAt ? ` · 汇率 ${timeAgo(health.fxUpdatedAt)}` : ''}
+        </div>
+      </div>
+      <div className="pipe-stats">
+        <div><div className="ps-v num">{apps?.length ?? '—'}</div><div className="ps-k">接入 App</div></div>
+        <div><div className="ps-v num">{health.rawNotifications.toLocaleString()}</div><div className="ps-k">原始事件</div></div>
+      </div>
+    </div>
+  )
+}
 import { ConnectSection } from './Connect'
 import { AppsSection } from './Apps'
 import { AlertsSection } from './Alerts'
@@ -31,6 +61,8 @@ function SettingsHome() {
   return (
     <div className="narrow">
       <PageHeader title="设置" />
+
+      <DataPipelineCard />
 
       <Section title="偏好">
         <div className="pref-row">

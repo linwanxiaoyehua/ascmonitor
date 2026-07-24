@@ -30,15 +30,13 @@ export async function loadAscCredentials(db: D1Database): Promise<AscCredentials
   return { keyId: map.asc_key_id, issuerId: map.asc_issuer_id, privateKeyPem: map.asc_private_key }
 }
 
-/** 签发 ASC API JWT（有效期 15 分钟，按 Apple 上限 ≤20min） */
-export async function ascJwt(creds: AscCredentials): Promise<string> {
+/** 签发 ASC API JWT（有效期 15 分钟，按 Apple 上限 ≤20min）；App Store Server API 需带 bid=Bundle ID */
+export async function ascJwt(creds: AscCredentials, bid?: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const header = b64url(new TextEncoder().encode(JSON.stringify({ alg: 'ES256', kid: creds.keyId, typ: 'JWT' })))
-  const payload = b64url(
-    new TextEncoder().encode(
-      JSON.stringify({ iss: creds.issuerId, iat: now, exp: now + 15 * 60, aud: 'appstoreconnect-v1' })
-    )
-  )
+  const claims: Record<string, unknown> = { iss: creds.issuerId, iat: now, exp: now + 15 * 60, aud: 'appstoreconnect-v1' }
+  if (bid) claims.bid = bid
+  const payload = b64url(new TextEncoder().encode(JSON.stringify(claims)))
   const key = await crypto.subtle.importKey(
     'pkcs8',
     pemToPkcs8(creds.privateKeyPem) as BufferSource,
@@ -334,6 +332,35 @@ export async function deleteWebhook(creds: AscCredentials, webhookId: string): P
   })
   // 404 = 已经不在了，视作成功
   if (!res.ok && res.status !== 404) throw new Error(`delete webhook ${res.status}: ${await res.text()}`)
+}
+
+export interface NotificationHistoryPage {
+  notifications: string[] // signedPayload（JWS）字符串，与 webhook 同构
+  hasMore: boolean
+  paginationToken?: string
+}
+
+/** App Store Server API - Get Notification History（近 180 天历史通知）。
+ *  需要 bid=Bundle ID 的 JWT；生产环境端点。401 多为需「In-App Purchase」密钥。 */
+export async function fetchNotificationHistory(
+  creds: AscCredentials,
+  bundleId: string,
+  params: { startDate: number; endDate: number; paginationToken?: string }
+): Promise<NotificationHistoryPage> {
+  const jwt = await ascJwt(creds, bundleId)
+  const url = `https://api.appstoreconnect.apple.com/inApps/v1/notifications/history${params.paginationToken ? `?paginationToken=${encodeURIComponent(params.paginationToken)}` : ''}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ startDate: params.startDate, endDate: params.endDate }),
+  })
+  if (!res.ok) throw new Error(`notificationHistory ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  const json = (await res.json()) as { notificationHistory?: Array<{ signedPayload: string }>; hasMore?: boolean; paginationToken?: string }
+  return {
+    notifications: (json.notificationHistory ?? []).map((n) => n.signedPayload).filter(Boolean),
+    hasMore: !!json.hasMore,
+    paginationToken: json.paginationToken,
+  }
 }
 
 /* ---------- 构建 / 审核状态（webhook 的对账兜底，每 App 2 个子请求）---------- */

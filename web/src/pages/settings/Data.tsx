@@ -92,7 +92,48 @@ function HealthSection() {
 }
 
 export function DataSection({ embedded = false }: { embedded?: boolean } = {}) {
+  const queryClient = useQueryClient()
   const [running, setRunning] = useState<string | null>(null)
+  const [backfilling, setBackfilling] = useState<string | null>(null)
+
+  // 从 ASC 回填近 180 天历史通知 → 串联 reprocess 重建交易/订阅状态
+  const backfill = async () => {
+    if (backfilling || running) return
+    setBackfilling('启动中…')
+    try {
+      let inserted = 0
+      for (let i = 0; i < 500; i++) {
+        const res = await api<{ inserted: number; hasMore: boolean; skipped: string }>(
+          `/api/jobs/backfill-notifications${i === 0 ? '?reset=1' : ''}`,
+          { method: 'POST' }
+        )
+        if (res.skipped) {
+          toast.error(res.skipped)
+          return
+        }
+        inserted += res.inserted
+        if (!res.hasMore) break
+        setBackfilling(`已回填 ${inserted} 条历史通知…`)
+      }
+      // 串联重建：回放全部历史通知重建交易/订阅状态
+      let total = 0
+      for (let i = 0; i < 500; i++) {
+        const res = await api<{ processed: number; done: boolean; remaining: number }>(
+          `/api/jobs/reprocess${i === 0 ? '?reset=1' : ''}`,
+          { method: 'POST' }
+        )
+        total += res.processed
+        if (res.done) break
+        setBackfilling(`回填 ${inserted} 条，重建中已回放 ${total} 条…`)
+      }
+      toast.success(`回填完成，新增 ${inserted} 条历史通知，重建回放 ${total} 条`)
+      queryClient.invalidateQueries()
+    } catch {
+      toast.error('回填中断，可再次点击续跑')
+    } finally {
+      setBackfilling(null)
+    }
+  }
 
   const run = async (kind: 'reviews' | 'sales' | 'products') => {
     if (running) return
@@ -144,6 +185,13 @@ export function DataSection({ embedded = false }: { embedded?: boolean } = {}) {
             detail="从 ASC 拉取内购/订阅名称，展示层替代 product id（每日自动同步）"
             trailing="chevron"
             onPress={() => run('products')}
+          />
+          <ListRow
+            leading={<span className="row-icon tone-info"><Icon name="download" size={16} /></span>}
+            title={backfilling ?? '回填历史订阅/内购（近 180 天）'}
+            detail="从 App Store Connect 拉取近 180 天历史通知补全订阅/交易（需 ASC 凭证；失败可能需 In-App Purchase 密钥）"
+            trailing="chevron"
+            onPress={backfill}
           />
         </div>
       </Section>

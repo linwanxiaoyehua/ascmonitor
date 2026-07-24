@@ -5,6 +5,7 @@ import { fetchReviewsJob } from '../jobs/fetch-reviews'
 import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
 import { fetchSalesJob } from '../jobs/fetch-sales'
 import { reprocessJob } from '../jobs/reprocess'
+import { backfillNotificationsJob } from '../jobs/backfill-notifications'
 import { fetchProductsJob } from '../jobs/fetch-products'
 import { rollupCohortsJob } from '../jobs/rollup-cohorts'
 import { revenueBreakdown, subHealth, trialCohorts } from '../lib/insights'
@@ -738,6 +739,13 @@ api.post('/jobs/fetch-sales', async (c) => {
   const result = await fetchSalesJob(c.env.DB)
   const days = await c.env.DB.prepare('SELECT COUNT(DISTINCT date) AS n FROM sales_daily').first<{ n: number }>()
   return c.json({ ok: true, ...result, totalDays: days?.n ?? 0 })
+})
+
+// 从 ASC 回填近 180 天历史通知（灌入 notifications_raw；灌完由前端串联 reprocess 重建）
+api.post('/jobs/backfill-notifications', async (c) => {
+  const reset = c.req.query('reset') === '1'
+  const res = await backfillNotificationsJob(c.env.DB, reset)
+  return c.json(res)
 })
 
 // 每日账单聚合（下载量 + 结算收入，折算 USD）；app_id 经 apps.asc_app_id ↔ sales_daily.apple_id 关联

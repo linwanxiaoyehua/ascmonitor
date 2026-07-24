@@ -118,9 +118,16 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   expired: 'neutral', revoked: 'neutral',
 }
 
+const STATUS_BUCKETS = [
+  { key: 'active', label: '活跃', statuses: ['active', 'grace_period', 'billing_retry'] },
+  { key: 'trial', label: '试用', statuses: ['trial'] },
+  { key: 'expired', label: '过期', statuses: ['expired', 'revoked'] },
+]
+
 function SubsList() {
   const appId = useAppFilter()
-  // 三级折叠：产品(订阅ID) → 国家 → 具体订阅；默认全折叠，最紧凑
+  // 四级折叠：状态 → 产品(订阅ID) → 国家 → 具体订阅；状态默认展开，产品/国家默认折叠
+  const [openStatus, setOpenStatus] = useState<Set<string>>(new Set(['active', 'trial', 'expired']))
   const [openProduct, setOpenProduct] = useState<Set<string>>(new Set())
   const [openCountry, setOpenCountry] = useState<Set<string>>(new Set())
   const [openTimeline, setOpenTimeline] = useState<string | null>(null)
@@ -141,22 +148,6 @@ function SubsList() {
       else n.add(key)
       return n
     })
-
-  // ① 按产品（订阅 ID）分组
-  const byProduct = new Map<string, { label: string; icon: string | null; app: string; rows: SubRow[] }>()
-  for (const s of subs) {
-    const key = `${s.app_bundle_id ?? ''}|${s.product_id}`
-    const g = byProduct.get(key)
-    if (g) g.rows.push(s)
-    else
-      byProduct.set(key, {
-        label: s.product_name ?? productDisplay(s.product_id, s.app_bundle_id) ?? s.product_id,
-        icon: s.app_icon,
-        app: appLabelOf(s.app_name, s.app_bundle_id),
-        rows: [s],
-      })
-  }
-  const products = [...byProduct.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length)
 
   const renderRow = (s: SubRow) => {
     const open = openTimeline === s.original_transaction_id
@@ -188,45 +179,80 @@ function SubsList() {
     )
   }
 
+  // 产品(订阅ID) → 国家 → 具体订阅；prefix=状态桶 key，避免同一产品跨状态桶时 key 冲突
+  const productTree = (items: SubRow[], prefix: string) => {
+    const byProduct = new Map<string, { label: string; icon: string | null; app: string; rows: SubRow[] }>()
+    for (const s of items) {
+      const key = `${s.app_bundle_id ?? ''}|${s.product_id}`
+      const g = byProduct.get(key)
+      if (g) g.rows.push(s)
+      else
+        byProduct.set(key, {
+          label: s.product_name ?? productDisplay(s.product_id, s.app_bundle_id) ?? s.product_id,
+          icon: s.app_icon,
+          app: appLabelOf(s.app_name, s.app_bundle_id),
+          rows: [s],
+        })
+    }
+    const products = [...byProduct.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length)
+
+    return products.map(([pid, g]) => {
+      const pKey = `${prefix}|${pid}`
+      const pOpen = openProduct.has(pKey)
+      // 按国家分组
+      const byCountry = new Map<string, SubRow[]>()
+      for (const s of g.rows) {
+        const c = s.country ?? '—'
+        const arr = byCountry.get(c)
+        if (arr) arr.push(s)
+        else byCountry.set(c, [s])
+      }
+      const countries = [...byCountry.entries()].sort((a, b) => b[1].length - a[1].length)
+      return (
+        <div className="tree-node" key={pKey}>
+          <button className={`tree-head lvl1${pOpen ? ' open' : ''}`} aria-expanded={pOpen} onClick={() => toggle(setOpenProduct, pKey)}>
+            <Icon name="chevronRight" size={16} className="tree-chev" />
+            <AppIcon url={g.icon} name={g.app || g.label} size={26} />
+            <span className="th-label">{g.label}</span>
+            <span className="th-count num">{g.rows.length}</span>
+          </button>
+          {pOpen && (
+            <div className="tree-children">
+              {countries.map(([country, crows]) => {
+                const cKey = `${pKey}|${country}`
+                const cOpen = openCountry.has(cKey)
+                return (
+                  <div className="tree-node" key={cKey}>
+                    <button className={`tree-head lvl2${cOpen ? ' open' : ''}`} aria-expanded={cOpen} onClick={() => toggle(setOpenCountry, cKey)}>
+                      <Icon name="chevronRight" size={15} className="tree-chev" />
+                      <span className="th-label">{countryFlag(country)} {countryName(country) || countryDisplay(country) || country}</span>
+                      <span className="th-count num">{crows.length}</span>
+                    </button>
+                    {cOpen && <div className="list tree-leaf">{crows.map(renderRow)}</div>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )
+    })
+  }
+
   return (
     <div className="sub-tree">
-      {products.map(([pKey, g]) => {
-        const pOpen = openProduct.has(pKey)
-        // ② 按国家分组
-        const byCountry = new Map<string, SubRow[]>()
-        for (const s of g.rows) {
-          const c = s.country ?? '—'
-          const arr = byCountry.get(c)
-          if (arr) arr.push(s)
-          else byCountry.set(c, [s])
-        }
-        const countries = [...byCountry.entries()].sort((a, b) => b[1].length - a[1].length)
+      {STATUS_BUCKETS.map((bucket) => {
+        const items = subs.filter((s) => bucket.statuses.includes(s.status))
+        if (!items.length) return null
+        const sOpen = openStatus.has(bucket.key)
         return (
-          <div className="tree-node" key={pKey}>
-            <button className={`tree-head lvl1${pOpen ? ' open' : ''}`} aria-expanded={pOpen} onClick={() => toggle(setOpenProduct, pKey)}>
+          <div className="tree-node" key={bucket.key}>
+            <button className={`tree-head lvl0${sOpen ? ' open' : ''}`} aria-expanded={sOpen} onClick={() => toggle(setOpenStatus, bucket.key)}>
               <Icon name="chevronRight" size={16} className="tree-chev" />
-              <AppIcon url={g.icon} name={g.app || g.label} size={26} />
-              <span className="th-label">{g.label}</span>
-              <span className="th-count num">{g.rows.length}</span>
+              <span className="th-label">{bucket.label}</span>
+              <span className="th-count num">{items.length}</span>
             </button>
-            {pOpen && (
-              <div className="tree-children">
-                {countries.map(([country, crows]) => {
-                  const cKey = `${pKey}|${country}`
-                  const cOpen = openCountry.has(cKey)
-                  return (
-                    <div className="tree-node" key={cKey}>
-                      <button className={`tree-head lvl2${cOpen ? ' open' : ''}`} aria-expanded={cOpen} onClick={() => toggle(setOpenCountry, cKey)}>
-                        <Icon name="chevronRight" size={15} className="tree-chev" />
-                        <span className="th-label">{countryFlag(country)} {countryName(country) || countryDisplay(country) || country}</span>
-                        <span className="th-count num">{crows.length}</span>
-                      </button>
-                      {cOpen && <div className="list tree-leaf">{crows.map(renderRow)}</div>}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            {sOpen && <div className="tree-children">{productTree(items, bucket.key)}</div>}
           </div>
         )
       })}

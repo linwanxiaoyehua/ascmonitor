@@ -16,12 +16,13 @@ export function AppSwitcher() {
   const { data: apps } = useQuery({ queryKey: ['apps'], queryFn: () => api<AppRow[]>('/api/apps') })
 
   const current = apps?.find((a) => a.id === appId) ?? null
-  // 只有一个 App 时切换器没有意义，仍显示名称但不可点
-  const single = (apps?.length ?? 0) <= 1
+  // 只有一个（或还没有）App 时切换没有意义 —— 不渲染，免得禁用态 chip 白占顶栏。
+  // 多 App 出现后自动恢复。加载期 apps 为 undefined，同样先不渲染，避免闪出占位 chip。
+  if ((apps?.length ?? 0) <= 1) return null
 
   return (
     <>
-      <button className="app-chip" onClick={() => !single && setOpen(true)} aria-haspopup="dialog" disabled={single && !current}>
+      <button className="app-chip" onClick={() => setOpen(true)} aria-haspopup="dialog">
         {current ? (
           <AppIcon url={current.icon_url} name={current.name} size={20} />
         ) : (
@@ -30,7 +31,7 @@ export function AppSwitcher() {
           </span>
         )}
         <span className="label">{current ? current.name : '全部 Apps'}</span>
-        {!single && <Icon name="chevronDown" size={13} />}
+        <Icon name="chevronDown" size={13} />
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="选择 App">

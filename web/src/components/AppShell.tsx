@@ -158,7 +158,8 @@ function NavTree({ location }: { location: string }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation()
   const ptr = usePullToRefresh()
-  // 设置页是全局配置，与 App 筛选无关 —— 不显示切换器
+  // 设置页是全局配置，与 App 筛选无关 —— 不显示切换器。
+  // 切换器在只有一个 App 时会自行返回 null（见 AppSwitcher），顶栏左侧留空、标题仍在内容区。
   const showSwitcher = activeTab(location)?.path !== '/settings'
   const crumbs = breadcrumb(location)
 

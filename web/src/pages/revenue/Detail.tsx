@@ -263,7 +263,7 @@ function SubsList() {
 function PurchasesList() {
   const appId = useAppFilter()
   // 四级折叠：类型(消耗型/买断/非续订) → 产品 → 国家 → 购买（对齐订阅树）
-  const [openType, setOpenType] = useState<Set<string>>(new Set(['Non-Consumable', 'Consumable', 'Non-Renewing Subscription']))
+  const [openType, setOpenType] = useState<Set<string>>(new Set(['Non-Consumable', 'Consumable', 'Non-Renewing Subscription', '__refunded__']))
   const [openProduct, setOpenProduct] = useState<Set<string>>(new Set())
   const [openCountry, setOpenCountry] = useState<Set<string>>(new Set())
   const q = useInfiniteQuery({
@@ -363,14 +363,17 @@ function PurchasesList() {
       })
   }
 
-  // 一级：按内购类型
+  // 已退款单独成栏；其余按内购类型
+  const active = purchases.filter((p) => !p.refunded)
+  const refunded = purchases.filter((p) => p.refunded)
   const byType = new Map<string, PurchaseRow[]>()
-  for (const p of purchases) {
+  for (const p of active) {
     const arr = byType.get(p.type)
     if (arr) arr.push(p)
     else byType.set(p.type, [p])
   }
   const types = [...byType.entries()].sort((a, b) => b[1].length - a[1].length)
+  const refundedOpen = openType.has('__refunded__')
 
   return (
     <>
@@ -388,6 +391,16 @@ function PurchasesList() {
             </div>
           )
         })}
+        {refunded.length > 0 && (
+          <div className="tree-node" key="__refunded__">
+            <button className={`tree-head lvl0${refundedOpen ? ' open' : ''}`} aria-expanded={refundedOpen} onClick={() => toggle(setOpenType, '__refunded__')}>
+              <Icon name="chevronRight" size={16} className="tree-chev" />
+              <span className="th-label neg">已退款</span>
+              <span className="th-count num">{refunded.length}</span>
+            </button>
+            {refundedOpen && <div className="tree-children">{productTree(refunded, '__refunded__')}</div>}
+          </div>
+        )}
       </div>
       <LoadMore hasNextPage={!!q.hasNextPage} isFetchingNextPage={q.isFetchingNextPage} fetchNextPage={() => q.fetchNextPage()} />
     </>

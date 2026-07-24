@@ -1583,3 +1583,6 @@ button.kpi-card { cursor: pointer; }
 .sub-tree .tree-head.lvl0 .th-label { font-size: var(--fs-5); font-weight: var(--fw-bold); color: var(--text-1); }
 .sub-tree .tree-head.lvl0 .th-count { color: var(--accent-text); background: var(--accent-soft); }
 @media (hover: hover) and (pointer: fine) { .sub-tree .tree-head:hover { background: var(--bg-raised); } }
+
+/* 一次性购买「已退款」栏标题红色 */
+.sub-tree .tree-head .th-label.neg { color: var(--danger); }

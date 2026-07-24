@@ -525,17 +525,39 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   width: calc(100% - var(--s3) * 2);
   max-width: 420px;
   display: flex; justify-content: space-around;
-  /* 比共享 --bar-bg 更透，配强 blur/saturate 才有"液态玻璃"透光感（仍保 11px 标签可读） */
-  background: light-dark(rgba(236, 237, 243, 0.6), rgba(16, 16, 24, 0.54));
-  -webkit-backdrop-filter: saturate(190%) blur(24px);
-  backdrop-filter: saturate(190%) blur(24px);
+  /* 液态玻璃材质（WebKit 可生效，不依赖 Safari 不支持的 SVG 折射）：
+     ① 斜向白渐变 = 表面光泽/反光方向；② 半透底色 = 玻璃本体 tint；
+     配合下方 border 亮边 + ::after 镜面高光/边缘色散，三层合成玻璃观感。 */
+  background:
+    linear-gradient(135deg,
+      light-dark(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.10)),
+      light-dark(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02)) 44%,
+      light-dark(rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.06))),
+    light-dark(rgba(238, 239, 245, 0.44), rgba(14, 14, 22, 0.42));
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
   padding: var(--s1) var(--s2);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid light-dark(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-pill);
   box-shadow:
     var(--shadow-float),
-    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08));
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.14));
   z-index: 100;
+}
+/* 玻璃高光层：顶部镜面亮边 + 底部内发光 + 左右边缘冷暖色散（模拟折射，screen 提亮不挡内容）。
+   仅描边处着色，中部透明，故不影响图标可读性。 */
+.tabbar::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  mix-blend-mode: screen;
+  box-shadow:
+    inset 1.5px 0 0 rgba(255, 116, 138, 0.26),
+    inset -1.5px 0 0 rgba(96, 204, 255, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -12px 20px rgba(255, 255, 255, 0.05);
 }
 .tabbar a {
   position: relative;

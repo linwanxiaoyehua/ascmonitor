@@ -6,6 +6,7 @@ import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
 import { fetchSalesJob } from '../jobs/fetch-sales'
 import { reprocessJob } from '../jobs/reprocess'
 import { backfillNotificationsJob } from '../jobs/backfill-notifications'
+import { rollupMetricsJob } from '../jobs/rollup-metrics'
 import { fetchProductsJob } from '../jobs/fetch-products'
 import { rollupCohortsJob } from '../jobs/rollup-cohorts'
 import { revenueBreakdown, subHealth, trialCohorts } from '../lib/insights'
@@ -745,6 +746,13 @@ api.post('/jobs/fetch-sales', async (c) => {
 api.post('/jobs/backfill-notifications', async (c) => {
   const reset = c.req.query('reset') === '1'
   const res = await backfillNotificationsJob(c.env.DB, reset)
+  return c.json(res)
+})
+
+// 历史指标重算：对有交易的每天跑 rollupDaily 重建 metrics_daily（曲线/当月收入）
+api.post('/jobs/rollup-metrics', async (c) => {
+  const reset = c.req.query('reset') === '1'
+  const res = await rollupMetricsJob(c.env.DB, reset)
   return c.json(res)
 })
 

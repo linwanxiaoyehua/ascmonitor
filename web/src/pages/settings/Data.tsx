@@ -32,7 +32,18 @@ function HealthSection() {
         if (res.done) break
         setRebuilding(`已回放 ${total} 条，剩余约 ${res.remaining} 条…`)
       }
-      toast.success(`重建完成，共回放 ${total} 条通知`)
+      // reprocess 只重建交易/订阅，不碰 metrics_daily —— 顺带重算每日指标（曲线/当月收入）
+      let days = 0
+      for (let i = 0; i < 500; i++) {
+        const res = await api<{ processed: number; done: boolean; remaining: number }>(
+          `/api/jobs/rollup-metrics${i === 0 ? '?reset=1' : ''}`,
+          { method: 'POST' }
+        )
+        days += res.processed
+        if (res.done) break
+        setRebuilding(`重算每日指标… 已 ${days} 天`)
+      }
+      toast.success(`重建完成，回放 ${total} 条通知，重算 ${days} 天指标`)
       queryClient.invalidateQueries()
     } catch {
       toast.error('重建中断，可再次点击续跑')
@@ -126,7 +137,18 @@ export function DataSection({ embedded = false }: { embedded?: boolean } = {}) {
         if (res.done) break
         setBackfilling(`回填 ${inserted} 条，重建中已回放 ${total} 条…`)
       }
-      toast.success(`回填完成，新增 ${inserted} 条历史通知，重建回放 ${total} 条`)
+      // 重算历史每日指标（曲线 / 当月收入），否则趋势不更新
+      let days = 0
+      for (let i = 0; i < 500; i++) {
+        const res = await api<{ processed: number; done: boolean; remaining: number }>(
+          `/api/jobs/rollup-metrics${i === 0 ? '?reset=1' : ''}`,
+          { method: 'POST' }
+        )
+        days += res.processed
+        if (res.done) break
+        setBackfilling(`重算每日指标… 已 ${days} 天`)
+      }
+      toast.success(`回填完成：新增 ${inserted} 条历史通知，重建 ${total} 条，重算 ${days} 天指标`)
       queryClient.invalidateQueries()
     } catch {
       toast.error('回填中断，可再次点击续跑')

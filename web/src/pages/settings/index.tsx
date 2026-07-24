@@ -63,7 +63,14 @@ function SettingsHome() {
       {/* 数据管道状态 */}
       <DataPipelineCard />
 
-      {/* 外观 */}
+      {/* 全部配置内联为单长页（对齐 设置.dc.html 顺序）；子路由仍保留供深链/侧边栏 */}
+      <AlertsSection embedded />
+      <AppsSection embedded />
+      <ConnectSection embedded />
+      <DataSection embedded />
+      <BuildsSection embedded />
+
+      {/* 外观（对齐设计稿，靠近底部） */}
       <Section title="外观">
         <div className="pref-row">
           <span className="pref-label">主题</span>
@@ -77,13 +84,6 @@ function SettingsHome() {
           </div>
         </div>
       </Section>
-
-      {/* 全部配置内联为单长页（对齐 设置.dc.html）；子路由仍保留供深链/侧边栏 */}
-      <AlertsSection embedded />
-      <AppsSection embedded />
-      <ConnectSection embedded />
-      <DataSection embedded />
-      <BuildsSection embedded />
 
       <Section title="关于">
         <div className="list">

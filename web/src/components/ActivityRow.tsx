@@ -3,7 +3,6 @@
 
 import type { ActivityItem } from '../lib/api'
 import { appLabelOf, countryDisplay, productDisplay, subtypeLabel, REVENUE_TYPES } from '../lib/format'
-import { AppIcon } from './AppIcon'
 import { Icon, type IconName } from './Icon'
 import { Badge, ListRow } from './ui'
 
@@ -69,18 +68,7 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
     const badgeLabel = BUILD_BADGES[item.alertKind]
     return (
       <ListRow
-        leading={
-          buildIcon && item.appIcon ? (
-            <div className="icon-stack">
-              <AppIcon url={item.appIcon} name={item.appName} size={32} />
-              <span className={`icon-badge tone-${meta.tone}`}>
-                <Icon name={meta.icon} size={10} />
-              </span>
-            </div>
-          ) : (
-            <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={16} /></span>
-          )
-        }
+        leading={<span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={18} /></span>}
         title={stripLeadingEmoji(item.title)}
         badges={
           badgeLabel ? (
@@ -115,18 +103,7 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
 
   return (
     <ListRow
-      leading={
-        item.appIcon ? (
-          <div className="icon-stack">
-            <AppIcon url={item.appIcon} name={appLabel} size={32} />
-            <span className={`icon-badge tone-${meta.tone}`}>
-              <Icon name={meta.icon} size={10} />
-            </span>
-          </div>
-        ) : (
-          <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={16} /></span>
-        )
-      }
+      leading={<span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={18} /></span>}
       title={
         <>
           {meta.label}

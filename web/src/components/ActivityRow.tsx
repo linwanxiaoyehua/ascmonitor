@@ -101,8 +101,9 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   const isRefund = item.type === 'REFUND'
   // 请求退款（Apple 询问消耗信息以裁定退款）：展示涉及金额，但钱未动，不带 +/− 符号
   const isRefundRequest = item.type === 'CONSUMPTION_REQUEST'
-  // 0 元交易（免费试用开始）不显示 "+¥0.00"
-  const showAmount = (isRevenue || isRefund || isRefundRequest) && item.priceMilli != null && item.priceMilli > 0
+  // 免费试用金额为 0，仍要显示（¥0.00）并配「试用」徽标说明；其他 0 元事件照旧隐藏
+  const isTrial = item.isTrial === true
+  const showAmount = (isRevenue || isRefund || isRefundRequest) && item.priceMilli != null && (item.priceMilli > 0 || isTrial)
   const amountSign = isRefund ? 'neg' : isRefundRequest ? undefined : 'pos'
   const detail = [
     appLabel,
@@ -132,7 +133,12 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
           {item.subtype && <span className="muted">{subtypeLabel(item.subtype)}</span>}
         </>
       }
-      badges={item.environment === 'Sandbox' ? <Badge tone="neutral">沙盒</Badge> : undefined}
+      badges={
+        <>
+          {isTrial && <Badge tone="info">试用</Badge>}
+          {item.environment === 'Sandbox' && <Badge tone="neutral">沙盒</Badge>}
+        </>
+      }
       detail={detail}
       amount={showAmount ? { milli: item.priceMilli, currency: item.currency, sign: amountSign } : undefined}
       time={item.ts}

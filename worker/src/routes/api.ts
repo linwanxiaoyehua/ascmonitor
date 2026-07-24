@@ -168,7 +168,7 @@ api.get('/activity', async (c) => {
       c.env.DB.prepare(
         `SELECT n.uuid, n.app_id, n.type, n.subtype, n.decoded_json, n.received_at,
                 a.name AS app_name, a.icon_url AS app_icon, a.bundle_id AS app_bundle_id,
-                t.product_id, t.price_milli, t.currency, t.country, p.name AS product_name
+                t.product_id, t.price_milli, t.currency, t.country, t.is_trial, p.name AS product_name
          FROM notifications_raw n
          LEFT JOIN apps a ON a.id = n.app_id
          LEFT JOIN transactions t ON t.raw_uuid = n.uuid
@@ -182,7 +182,7 @@ api.get('/activity', async (c) => {
           uuid: string; app_id: number; type: string; subtype: string | null; decoded_json: string; received_at: number
           app_name: string | null; app_icon: string | null; app_bundle_id: string | null
           product_id: string | null; price_milli: number | null; currency: string | null; country: string | null
-          product_name: string | null
+          is_trial: number | null; product_name: string | null
         }>()
         .then(async (rows) => {
           const items = rows.results.map((r) => {
@@ -201,6 +201,7 @@ api.get('/activity', async (c) => {
               priceMilli: r.price_milli ?? tx?.price ?? null,
               currency: r.currency ?? tx?.currency ?? null,
               country: r.country ?? tx?.storefront ?? null,
+              isTrial: r.is_trial === 1, // 免费试用（0 元）也要显示金额并标「试用」
             }
           })
           // join 未命中（退款/消耗查询）的行没有 product_name，按 productId 批量补正式名

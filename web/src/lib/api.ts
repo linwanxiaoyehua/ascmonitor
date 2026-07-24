@@ -191,6 +191,7 @@ export type ActivityItem =
       priceMilli: number | null
       currency: string | null
       country: string | null
+      isTrial?: boolean
     }
   | {
       kind: 'alert'

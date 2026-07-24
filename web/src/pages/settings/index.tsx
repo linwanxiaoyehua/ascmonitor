@@ -113,15 +113,15 @@ function SettingsHome() {
     <div className="narrow">
       <PageHeader title="设置" />
 
-      {/* 数据管道状态 */}
+      {/* 顶部：数据管道健康概览 */}
       <DataPipelineCard />
 
-      {/* 全部配置内联为单长页（对齐 设置.dc.html 顺序）；子路由仍保留供深链/侧边栏 */}
-      <AlertsSection embedded />
+      {/* 单长页，按「配置 → 运维 → 偏好」功能顺序；子路由保留供深链/侧边栏 */}
       <AppsSection embedded />
       <ConnectSection embedded />
-      <DataSection embedded />
+      <AlertsSection embedded />
       <BuildsSection embedded />
+      <DataSection embedded />
 
       {/* 外观（对齐设计稿，靠近底部） */}
       <Section title="外观">

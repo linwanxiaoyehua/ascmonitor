@@ -1227,9 +1227,9 @@ body { background: var(--bg-app); }
 
 /* ---- 订阅健康环形卡 ---- */
 .health-card { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
-.health-card .donut-center { display: flex; flex-direction: column; align-items: center; }
-.health-card .dc-value { font-size: var(--fs-8); font-weight: var(--fw-heavy); letter-spacing: -0.02em; color: var(--text-1); line-height: 1; }
-.health-card .dc-label { font-size: var(--fs-2); color: var(--text-3); margin-top: 3px; }
+.donut-center { display: flex; flex-direction: column; align-items: center; }
+.donut-center .dc-value { font-size: var(--fs-8); font-weight: var(--fw-heavy); letter-spacing: -0.02em; color: var(--text-1); line-height: 1; }
+.donut-center .dc-label { font-size: var(--fs-2); color: var(--text-3); margin-top: 3px; }
 .health-legend { list-style: none; flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: var(--s2-5); }
 .health-legend li { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-3); }
 .health-legend .hl-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }

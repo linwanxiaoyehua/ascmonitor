@@ -54,17 +54,9 @@ function HealthSection() {
 
   if (!health) return <Skeleton variant="rows" count={3} />
 
-  const webhookAge = health.lastWebhookAt ? Date.now() - health.lastWebhookAt : null
-  const webhookTone = webhookAge == null ? 'neutral' : webhookAge < 3600_000 ? 'success' : webhookAge < 86400_000 ? 'warning' : 'danger'
-
   return (
     <>
       <div className="list">
-        <ListRow
-          leading={<span className={`row-icon tone-${webhookTone === 'neutral' ? 'info' : webhookTone}`}><Icon name="zap" size={16} /></span>}
-          title="Webhook 管道"
-          detail={health.lastWebhookAt ? `最近事件 ${timeAgo(health.lastWebhookAt)} · 共 ${health.rawNotifications} 条通知` : '还没有收到过通知'}
-        />
         <ListRow
           leading={<span className={`row-icon ${health.fxUpdatedAt ? 'tone-success' : ''}`}><Icon name="dollar" size={16} /></span>}
           title="汇率"

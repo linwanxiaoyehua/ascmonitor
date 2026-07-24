@@ -22,15 +22,18 @@ const KIND_FILTERS = [
 
 export function ActivityPage() {
   const appId = useAppFilter()
-  const [kind, setKind] = useState<string | null>(null)
+  // 空数组＝全部；多选并集（后端 kinds 逗号分隔已支持）
+  const [kinds, setKinds] = useState<string[]>([])
   const [hideSandbox, setHideSandbox] = useState(false)
+  const toggleKind = (key: string) =>
+    setKinds((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))
 
   const q = useInfiniteQuery({
-    queryKey: ['activity', appId, kind, hideSandbox],
+    queryKey: ['activity', appId, kinds, hideSandbox],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams()
       if (pageParam) params.set('before', String(pageParam))
-      if (kind) params.set('kinds', kind)
+      if (kinds.length) params.set('kinds', kinds.join(','))
       if (hideSandbox) params.set('sandbox', '0')
       return api<{ items: ActivityItem[]; nextBefore: number | null }>(withAppParam(`/api/activity?${params}`, appId))
     },
@@ -66,7 +69,7 @@ export function ActivityPage() {
   return (
     <SubPage title="实时动态" backTo="/" backLabel="返回总览" width="narrow-lg">
       <div className="hstack-center">
-        <FilterChips scroll label="事件类型" items={KIND_FILTERS} active={kind} onToggle={setKind} />
+        <FilterChips scroll multiple label="事件类型" items={KIND_FILTERS} active={kinds} onToggle={toggleKind} />
         <button
           className={`chip${hideSandbox ? ' active' : ''}`}
           aria-pressed={hideSandbox}
@@ -84,7 +87,7 @@ export function ActivityPage() {
         <EmptyState
           icon="activity"
           title="还没有动态"
-          hint={kind ? '当前筛选下没有记录' : '在 App Store Connect 配置 Server URL 后，事件会实时出现在这里'}
+          hint={kinds.length ? '当前筛选下没有记录' : '在 App Store Connect 配置 Server URL 后，事件会实时出现在这里'}
         />
       ) : (
         groups.map((g) => {

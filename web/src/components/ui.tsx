@@ -297,23 +297,31 @@ export function SegmentedLinks({
   )
 }
 
-export function FilterChips({
-  items, active, onToggle, scroll, label,
-}: {
+// 单选：active 为 string|null，点激活项取消回「全部」。
+// 多选：active 为 string[]（空数组＝全部），onToggle 只回传被点的 key，由父组件增删。
+type FilterChipsProps = {
   items: Array<{ key: string; label: string; count?: number }>
-  active: string | null
-  onToggle: (key: string | null) => void
   scroll?: boolean
   label?: string
-}) {
+} & (
+  | { multiple?: false; active: string | null; onToggle: (key: string | null) => void }
+  | { multiple: true; active: string[]; onToggle: (key: string) => void }
+)
+
+export function FilterChips(props: FilterChipsProps) {
+  const { items, scroll, label } = props
+  const isActive = (key: string) =>
+    props.multiple ? props.active.includes(key) : props.active === key
+  const handle = (key: string) =>
+    props.multiple ? props.onToggle(key) : props.onToggle(props.active === key ? null : key)
   return (
     <div className={`chips${scroll ? ' scroll' : ''}`} role="group" aria-label={label}>
       {items.map((it) => (
         <button
           key={it.key}
-          className={`chip${active === it.key ? ' active' : ''}`}
-          aria-pressed={active === it.key}
-          onClick={() => onToggle(active === it.key ? null : it.key)}
+          className={`chip${isActive(it.key) ? ' active' : ''}`}
+          aria-pressed={isActive(it.key)}
+          onClick={() => handle(it.key)}
         >
           {it.label}
           {it.count != null && <span className="num">{it.count}</span>}

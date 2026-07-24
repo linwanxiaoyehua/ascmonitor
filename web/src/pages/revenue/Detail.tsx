@@ -1,7 +1,7 @@
 // 收入 · 明细：审计（对账卡）+ 交易流水（订阅状态分组 ⇄ 一次性购买）
 // 单笔金额恒为原币客户价（事实记录，不随全局口径换算）
 
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import {
   api, type PurchaseRow, type Reconciliation, type SubRow, type TimelineRow,
@@ -12,16 +12,10 @@ import {
   appLabelOf, countryDisplay, countryFlag, countryName, expiresDisplay, periodLabel, productDisplay, subtypeLabel, timeAgo,
 } from '../../lib/format'
 import { AppIcon } from '../../components/AppIcon'
+import { Icon } from '../../components/Icon'
 import {
-  Badge, CaliberTag, EmptyState, ListRow, LoadMore, Section, SegmentedControl, Skeleton,
+  Badge, type BadgeTone, CaliberTag, EmptyState, ListRow, LoadMore, Section, SegmentedControl, Skeleton,
 } from '../../components/ui'
-
-const STATUS_GROUPS: Array<{ title: string; statuses: string[] }> = [
-  { title: '试用中', statuses: ['trial'] },
-  { title: '活跃订阅', statuses: ['active'] },
-  { title: '流失风险', statuses: ['grace_period', 'billing_retry'] },
-  { title: '已流失', statuses: ['expired', 'revoked'] },
-]
 
 const STATUS_LABELS: Record<string, string> = {
   trial: '试用中',
@@ -119,9 +113,17 @@ function Timeline({ otid }: { otid: string }) {
   )
 }
 
+const STATUS_TONE: Record<string, BadgeTone> = {
+  trial: 'info', active: 'success', grace_period: 'warning', billing_retry: 'warning',
+  expired: 'neutral', revoked: 'neutral',
+}
+
 function SubsList() {
   const appId = useAppFilter()
-  const [expanded, setExpanded] = useState<string | null>(null)
+  // 三级折叠：产品(订阅ID) → 国家 → 具体订阅；默认全折叠，最紧凑
+  const [openProduct, setOpenProduct] = useState<Set<string>>(new Set())
+  const [openCountry, setOpenCountry] = useState<Set<string>>(new Set())
+  const [openTimeline, setOpenTimeline] = useState<string | null>(null)
   const { data: subs, isPending } = useQuery({
     queryKey: ['subscriptions', appId],
     queryFn: () => api<SubRow[]>(withAppParam('/api/subscriptions', appId)),
@@ -132,42 +134,54 @@ function SubsList() {
     return <EmptyState icon="users" title="还没有订阅记录" hint="收到 App Store 订阅通知后会自动出现在这里" />
   }
 
+  const toggle = (setter: Dispatch<SetStateAction<Set<string>>>, key: string) =>
+    setter((prev) => {
+      const n = new Set(prev)
+      if (n.has(key)) n.delete(key)
+      else n.add(key)
+      return n
+    })
+
+  // ① 按产品（订阅 ID）分组
+  const byProduct = new Map<string, { label: string; icon: string | null; app: string; rows: SubRow[] }>()
+  for (const s of subs) {
+    const key = `${s.app_bundle_id ?? ''}|${s.product_id}`
+    const g = byProduct.get(key)
+    if (g) g.rows.push(s)
+    else
+      byProduct.set(key, {
+        label: s.product_name ?? productDisplay(s.product_id, s.app_bundle_id) ?? s.product_id,
+        icon: s.app_icon,
+        app: appLabelOf(s.app_name, s.app_bundle_id),
+        rows: [s],
+      })
+  }
+  const products = [...byProduct.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length)
+
   const renderRow = (s: SubRow) => {
-    const open = expanded === s.original_transaction_id
-    const appLabel = appLabelOf(s.app_name, s.app_bundle_id)
-    // 已按国家分组时，行内 detail 不再重复国家
+    const open = openTimeline === s.original_transaction_id
     const detail = [
-      appLabel,
-      s.status === 'expired' || s.status === 'revoked' ? STATUS_LABELS[s.status] : expiresDisplay(s.expires_at),
-    ]
-      .filter(Boolean)
-      .join(' · ')
+      periodLabel(s.period),
+      s.status === 'expired' || s.status === 'revoked' ? '' : expiresDisplay(s.expires_at),
+    ].filter(Boolean).join(' · ')
     return (
       <div key={s.original_transaction_id}>
         <ListRow
-          leading={<AppIcon url={s.app_icon} name={appLabel || s.product_id} size={32} />}
           title={
             <>
               {s.product_name ?? productDisplay(s.product_id, s.app_bundle_id)}
-              {periodLabel(s.period) && <span className="muted">{periodLabel(s.period)}</span>}
-            </>
-          }
-          badges={
-            <>
-              {(s.status === 'grace_period' || s.status === 'billing_retry') && (
-                <Badge tone="warning">{STATUS_LABELS[s.status]}</Badge>
-              )}
+              <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{STATUS_LABELS[s.status] ?? s.status}</Badge>
               {!s.auto_renew && (s.status === 'active' || s.status === 'trial') && (
                 <Badge tone="warning">已关续费</Badge>
               )}
             </>
           }
-          detail={detail}
+          detail={detail || undefined}
           amount={{ milli: s.price_milli, currency: s.currency }}
           time={s.updated_at}
           trailing="chevron"
           chevronOpen={open}
-          onPress={() => setExpanded(open ? null : s.original_transaction_id)}
+          onPress={() => setOpenTimeline(open ? null : s.original_transaction_id)}
         />
         {open && <Timeline otid={s.original_transaction_id} />}
       </div>
@@ -175,44 +189,48 @@ function SubsList() {
   }
 
   return (
-    <>
-      {STATUS_GROUPS.map((group) => {
-        const items = subs.filter((s) => group.statuses.includes(s.status))
-        if (!items.length) return null
-        // 组内 ≥2 个国家时二级按国家分组（避免「长一串」）；单一国家保持平铺
+    <div className="sub-tree">
+      {products.map(([pKey, g]) => {
+        const pOpen = openProduct.has(pKey)
+        // ② 按国家分组
         const byCountry = new Map<string, SubRow[]>()
-        for (const s of items) {
+        for (const s of g.rows) {
           const c = s.country ?? '—'
           const arr = byCountry.get(c)
           if (arr) arr.push(s)
           else byCountry.set(c, [s])
         }
-        const grouped = byCountry.size >= 2
         const countries = [...byCountry.entries()].sort((a, b) => b[1].length - a[1].length)
         return (
-          <div key={group.title}>
-            <div className="group-label">
-              {group.title}
-              <span className="count">{items.length}</span>
-              {grouped && <span className="count">{byCountry.size} 个地区</span>}
-            </div>
-            {grouped ? (
-              countries.map(([country, rows]) => (
-                <div className="sub-country" key={country}>
-                  <div className="subgroup-head">
-                    <span>{countryFlag(country)} {countryName(country) || countryDisplay(country) || country}</span>
-                    <span className="sg-count num">{rows.length}</span>
-                  </div>
-                  <div className="list">{rows.map(renderRow)}</div>
-                </div>
-              ))
-            ) : (
-              <div className="list">{items.map(renderRow)}</div>
+          <div className="tree-node" key={pKey}>
+            <button className={`tree-head lvl1${pOpen ? ' open' : ''}`} aria-expanded={pOpen} onClick={() => toggle(setOpenProduct, pKey)}>
+              <Icon name="chevronRight" size={16} className="tree-chev" />
+              <AppIcon url={g.icon} name={g.app || g.label} size={26} />
+              <span className="th-label">{g.label}</span>
+              <span className="th-count num">{g.rows.length}</span>
+            </button>
+            {pOpen && (
+              <div className="tree-children">
+                {countries.map(([country, crows]) => {
+                  const cKey = `${pKey}|${country}`
+                  const cOpen = openCountry.has(cKey)
+                  return (
+                    <div className="tree-node" key={cKey}>
+                      <button className={`tree-head lvl2${cOpen ? ' open' : ''}`} aria-expanded={cOpen} onClick={() => toggle(setOpenCountry, cKey)}>
+                        <Icon name="chevronRight" size={15} className="tree-chev" />
+                        <span className="th-label">{countryFlag(country)} {countryName(country) || countryDisplay(country) || country}</span>
+                        <span className="th-count num">{crows.length}</span>
+                      </button>
+                      {cOpen && <div className="list tree-leaf">{crows.map(renderRow)}</div>}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         )
       })}
-    </>
+    </div>
   )
 }
 

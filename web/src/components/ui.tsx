@@ -54,13 +54,15 @@ export function CaliberTag({ children }: { children: ReactNode }) {
 /* ---------- StatCard ---------- */
 
 export function StatCard({
-  label, value, delta, badge, icon, loading, onPress, foot, spark, hero,
+  label, value, delta, badge, icon, tone, loading, onPress, foot, spark, hero,
 }: {
   label: string
   value: ReactNode
   delta?: { text: string; direction: 'up' | 'down' }
   badge?: ReactNode
   icon?: IconName
+  /** 图标语义色片：指标身份色（收入=success、订阅=violet、活跃=teal、退款=danger…）。缺省沿用灰图标 */
+  tone?: 'accent' | 'success' | 'danger' | 'info' | 'violet' | 'teal'
   loading?: boolean
   onPress?: () => void
   foot?: ReactNode
@@ -74,7 +76,7 @@ export function StatCard({
     <>
       <div className="stat-main">
         <div className="label">
-          {icon && <Icon name={icon} size={13} />}
+          {icon && <span className={`stat-ic${tone ? ` tone-${tone}` : ''}`}><Icon name={icon} size={15} /></span>}
           <span className="label-text">{label}</span>
           {/* 徽标走行内靠右而非绝对定位：卡片变窄时绝对定位会直接压在 label 上，
               行内布局则由 label-text 的 ellipsis 让位，结构上不可能重叠 */}

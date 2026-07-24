@@ -139,6 +139,7 @@ export function OverviewPage() {
             sparkline 直接复用下方收入趋势的同一份数据，口径切换时两者同步变化 */}
         <StatCard
           hero
+          tone="success"
           spark={trendData.map((d) => d.value)}
           loading={overviewQ.isPending}
           icon="dollar"
@@ -151,6 +152,7 @@ export function OverviewPage() {
         <StatCard
           loading={metricsQ.isPending}
           icon="chart"
+          tone="accent"
           label="本月收入"
           value={fmtUsd(monthRevenue)}
           foot={`新订 ${monthSum((d) => d.new_subs)} · 续费 ${monthSum((d) => d.renewals)}`}
@@ -159,6 +161,7 @@ export function OverviewPage() {
         <StatCard
           loading={overviewQ.isPending}
           icon="trendingUp"
+          tone="violet"
           label="MRR"
           value={o ? fmtUsd(o.mrrUsdMilli) : ''}
           foot={o ? `ARR ${fmtUsd(o.mrrUsdMilli * 12)}` : undefined}
@@ -167,6 +170,7 @@ export function OverviewPage() {
         <StatCard
           loading={overviewQ.isPending}
           icon="users"
+          tone="teal"
           label="活跃订阅"
           badge={<CaliberTag>{subsSource}</CaliberTag>}
           value={String(activeValue)}

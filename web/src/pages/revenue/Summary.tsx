@@ -189,6 +189,7 @@ export function RevenueSummary() {
         <StatCard
           loading={overviewQ.isPending}
           icon="dollar"
+          tone="success"
           label="今日收入"
           value={o ? fmtUsd(todayRevenue) : ''}
           foot={o ? `新订 ${o.todayNewSubs} · 续费 ${o.todayRenewals}` : undefined}
@@ -196,6 +197,7 @@ export function RevenueSummary() {
         <StatCard
           loading={metricsQ.isPending}
           icon="chart"
+          tone="accent"
           label="本月收入"
           value={fmtUsd(revenueMonth)}
           foot={`新订 ${monthSum((d) => d.new_subs)} · 续费 ${monthSum((d) => d.renewals)}`}
@@ -203,6 +205,7 @@ export function RevenueSummary() {
         <StatCard
           loading={metricsQ.isPending}
           icon="clock"
+          tone="accent"
           label="30 天收入"
           value={fmtUsd(revenue30)}
           foot={`新订 ${sum((d) => d.new_subs)} · 续费 ${sum((d) => d.renewals)}`}
@@ -210,6 +213,7 @@ export function RevenueSummary() {
         <StatCard
           loading={overviewQ.isPending}
           icon="trendingUp"
+          tone="violet"
           label="MRR"
           value={o ? fmtUsd(o.mrrUsdMilli) : ''}
           foot={o ? `ARR ${fmtUsd(o.mrrUsdMilli * 12)}` : undefined}
@@ -217,6 +221,7 @@ export function RevenueSummary() {
         <StatCard
           loading={metricsQ.isPending}
           icon="trendingDown"
+          tone="danger"
           label="30 天退款"
           value={String(sum((d) => d.refunds))}
           foot="笔数"

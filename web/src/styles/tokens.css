@@ -17,7 +17,8 @@
   /* ---- 语义层：背景与分层 ----
      灰阶带蓝紫色相（B 通道恒高于 R=G），不是中性灰 —— 这是「温度」的来源，成本为零。
      分层靠明度差：浅色 = 灰页底 + 白卡片；深色 = 更深的底 + 更亮的面。 */
-  --bg-app: light-dark(#f6f6f8, #0a0a10);
+  /* 浅色页底加深一档（原 #f6f6f8 太近白，白卡浮不起来 → 观感单薄）；深色不变 */
+  --bg-app: light-dark(#ecedf3, #0a0a10);
   --bg-surface: light-dark(#ffffff, #17171f);
   --bg-raised: light-dark(#f0f0f4, #22222d);
   --bg-inset: light-dark(#e9e9ef, #101017);
@@ -81,6 +82,11 @@
   --info: light-dark(#0b5f96, #7cc5ff);
   --info-icon: light-dark(#0f82c9, #57b7ff);
   --info-soft: light-dark(rgba(15, 130, 201, 0.1), rgba(87, 183, 255, 0.13));
+  /* KPI 图标片专用（订阅=紫 / 活跃=teal），承接图表板业务语义 */
+  --violet-icon: light-dark(#8b5fbf, #b79ae0);
+  --violet-soft: light-dark(rgba(139, 95, 191, 0.13), rgba(169, 135, 209, 0.16));
+  --teal-icon: light-dark(#1a92ae, #51c6e0);
+  --teal-soft: light-dark(rgba(33, 159, 187, 0.13), rgba(81, 198, 224, 0.15));
   --neutral: light-dark(rgba(20, 20, 40, 0.58), rgba(240, 240, 248, 0.5));
   --neutral-soft: light-dark(rgba(20, 20, 40, 0.07), rgba(240, 240, 248, 0.1));
 
@@ -160,7 +166,7 @@
 
   /* ---- Tab bar / 顶栏毛玻璃 ---- */
   /* 毛玻璃底色必须跟 --bg-app 同源，否则滚动时顶栏与页面底色有色差 */
-  --bar-bg: light-dark(rgba(246, 246, 248, 0.86), rgba(10, 10, 16, 0.82));
+  --bar-bg: light-dark(rgba(236, 237, 243, 0.86), rgba(10, 10, 16, 0.82));
 
   /* ---- 内容限宽 ---- */
   --w-main: 720px;

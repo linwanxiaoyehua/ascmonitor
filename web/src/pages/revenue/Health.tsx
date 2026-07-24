@@ -76,6 +76,7 @@ export function RevenueHealth() {
         <StatCard
           loading={overviewQ.isPending}
           icon="users"
+          tone="teal"
           label="活跃订阅"
           value={o ? String(o.activeSubs) : ''}
           foot={o ? `试用 ${o.trialSubs} · 流失风险 ${o.riskSubs}` : undefined}
@@ -83,6 +84,7 @@ export function RevenueHealth() {
         <StatCard
           loading={healthQ.isPending}
           icon="refresh"
+          tone="success"
           label="续订率"
           value={pct(h?.renewalRate)}
           foot={h ? `首续 ${h.firstRenewals} · 多续 ${h.repeatRenewals}` : undefined}
@@ -90,6 +92,7 @@ export function RevenueHealth() {
         <StatCard
           loading={trialsQ.isPending}
           icon="zap"
+          tone="accent"
           label="Trial 转化率"
           value={trialStarts > 0 ? `${Math.round((trialConverted / trialStarts) * 100)}%` : '—'}
           foot={trialStarts > 0 ? `${trialConverted}/${trialStarts} · 12 周` : '暂无试用'}
@@ -97,6 +100,7 @@ export function RevenueHealth() {
         <StatCard
           loading={healthQ.isPending}
           icon="trendingDown"
+          tone="danger"
           label="退款率 / Churn"
           value={pct(h?.refundRate)}
           foot={h ? `Churn ${pct(h.churnRate)}（主动 ${h.churnedVoluntary}/被动 ${h.churnedInvoluntary}）` : undefined}

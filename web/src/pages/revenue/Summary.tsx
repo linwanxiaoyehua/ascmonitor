@@ -1,6 +1,6 @@
-// 收入 · 概况：HERO（本月净额 + 今日/30天/ARPU + 趋势）→ KPI 条（MRR/新订/续费/退款）
-//   → 收入构成（近30天活动 stacked | 收入占比 donut）→ 下载量
-// 去重：对账归「明细」子页、转化漏斗归「订阅健康」子页、活跃订阅归「订阅健康」
+// 收入 · 概况（纯"钱"）：HERO（本月净额 + 今日/30天/ARPU + 趋势）→ KPI 条（MRR/新订/续费/退款）
+//   → 收入占比 donut（按产品/国家）→ 下载量
+// 职责划分：对账/逐笔→「明细」子页；近30天活动 stacked + 转化漏斗 + 活跃订阅/留存→「订阅健康」子页
 // 口径徽标不逐处标注——收入页头 CaliberSwitch 已指示当前口径
 
 import { useState } from 'react'
@@ -14,7 +14,6 @@ import { fmtUsd, fmtUsdCompact } from '../../lib/money'
 import { countryDisplay } from '../../lib/format'
 import { Donut } from '../../components/Donut'
 import { KpiCard } from '../../components/Kpi'
-import { StackedBars } from '../../components/StackedBars'
 import { TrendChart } from '../../components/TrendChart'
 import { Section, SegmentedControl, Skeleton } from '../../components/ui'
 
@@ -136,33 +135,15 @@ function RevenueKpis() {
   )
 }
 
-/* ---------- 收入构成：近30天活动 stacked | 收入占比 donut ---------- */
-function RevenueComposition({ rate }: { rate: number }) {
+/* ---------- 收入占比 donut（按产品 / 按国家）---------- */
+function RevenueBreakdown({ rate }: { rate: number }) {
   const appId = useAppFilter()
   const caliber = useCaliber()
   const [by, setBy] = useState<'country' | 'product'>('product')
-  const metricsQ = useQuery({
-    queryKey: ['metrics-daily', appId, 30],
-    queryFn: () => api<MetricsDaily[]>(withAppParam('/api/metrics/daily?days=30', appId)),
-  })
   const breakdownQ = useQuery({
     queryKey: ['breakdown', appId, by],
     queryFn: () => api<BreakdownRow[]>(withAppParam(`/api/metrics/breakdown?by=${by}&days=30`, appId)),
   })
-
-  // 近 30 天活动（新订/续费/退款笔数）按日堆叠
-  const byDate = new Map<string, { new_subs: number; renewals: number; refunds: number }>()
-  for (const d of metricsQ.data ?? []) {
-    const a = byDate.get(d.date) ?? { new_subs: 0, renewals: 0, refunds: 0 }
-    a.new_subs += d.new_subs; a.renewals += d.renewals; a.refunds += d.refunds
-    byDate.set(d.date, a)
-  }
-  const days = [...byDate.keys()].sort()
-  const stacked = [
-    { key: 'new_subs', name: '新订', color: 'var(--chart-1)', data: days.map((dt) => byDate.get(dt)!.new_subs) },
-    { key: 'renewals', name: '续费', color: 'var(--chart-4)', data: days.map((dt) => byDate.get(dt)!.renewals) },
-    { key: 'refunds', name: '退款', color: 'var(--chart-neg)', data: days.map((dt) => byDate.get(dt)!.refunds) },
-  ]
 
   const rows = breakdownQ.data ?? []
   const effective = effectiveCaliber(caliber, false)
@@ -172,54 +153,39 @@ function RevenueComposition({ rate }: { rate: number }) {
   const segs = rows.map((r, i) => ({ value: r.usdMilli, color: SEQ_COLORS[i % SEQ_COLORS.length], label: nameOf(r) }))
 
   return (
-    <div className="section-group">
-      <div className="group-label divider"><span>收入构成</span></div>
-      <div className="two-col">
-        <Section title="近 30 天活动">
-          <div className="panel pad">
-            <div className="compo-legend-inline">
-              {stacked.map((s) => (
-                <span key={s.key}><span className="cli-dot" style={{ background: s.color }} />{s.name}</span>
+    <Section title="收入占比（30 天）" className="mt-4">
+      <div className="panel pad">
+        <div className="mb-3">
+          <SegmentedControl
+            label="占比维度"
+            options={[{ value: 'product', label: '按产品' }, { value: 'country', label: '按国家' }]}
+            value={by}
+            onChange={setBy}
+          />
+        </div>
+        {rows.length ? (
+          <div className="compo-donut">
+            <Donut segments={segs} size={140} thickness={15} gap={3}>
+              <span className="donut-center">
+                <span className="dc-value num">{fmtUsd(applyCaliber(total, effective, rate))}</span>
+                <span className="dc-label">30 天</span>
+              </span>
+            </Donut>
+            <ul className="health-legend">
+              {rows.map((r, i) => (
+                <li key={r.key}>
+                  <span className="hl-dot" style={{ background: SEQ_COLORS[i % SEQ_COLORS.length] }} />
+                  <span className="hl-label">{nameOf(r)}</span>
+                  <span className="hl-pct num">{Math.round((r.usdMilli / total) * 100)}%</span>
+                </li>
               ))}
-            </div>
-            {days.length ? <StackedBars series={stacked} height={190} /> : <div className="chart-empty">暂无数据</div>}
+            </ul>
           </div>
-        </Section>
-        <Section title="收入占比">
-          <div className="panel pad">
-            <div className="mb-3">
-              <SegmentedControl
-                label="占比维度"
-                options={[{ value: 'product', label: '按产品' }, { value: 'country', label: '按国家' }]}
-                value={by}
-                onChange={setBy}
-              />
-            </div>
-            {rows.length ? (
-              <div className="compo-donut">
-                <Donut segments={segs} size={140} thickness={15} gap={3}>
-                  <span className="donut-center">
-                    <span className="dc-value num">{fmtUsd(applyCaliber(total, effective, rate))}</span>
-                    <span className="dc-label">30 天</span>
-                  </span>
-                </Donut>
-                <ul className="health-legend">
-                  {rows.map((r, i) => (
-                    <li key={r.key}>
-                      <span className="hl-dot" style={{ background: SEQ_COLORS[i % SEQ_COLORS.length] }} />
-                      <span className="hl-label">{nameOf(r)}</span>
-                      <span className="hl-pct num">{Math.round((r.usdMilli / total) * 100)}%</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="chart-empty">暂无数据</div>
-            )}
-          </div>
-        </Section>
+        ) : (
+          <div className="chart-empty">暂无数据</div>
+        )}
       </div>
-    </div>
+    </Section>
   )
 }
 
@@ -266,7 +232,7 @@ export function RevenueSummary() {
     <>
       <RevenueHero rate={rate} />
       <div className="mt-4"><RevenueKpis /></div>
-      <RevenueComposition rate={rate} />
+      <RevenueBreakdown rate={rate} />
       <DownloadsSection />
     </>
   )

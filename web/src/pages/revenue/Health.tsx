@@ -2,11 +2,17 @@
 // 口径徽标不逐处标注——收入页头 CaliberSwitch 已指示当前口径
 
 import { useQuery } from '@tanstack/react-query'
-import { api, type CohortRow, type Overview, type Reconciliation, type SubHealth, type TrialCohort } from '../../lib/api'
+import {
+  api, type CohortRow, type MetricsDaily, type Overview, type Reconciliation, type SalesDaily,
+  type SubHealth, type TrialCohort,
+} from '../../lib/api'
 import { useAppFilter, withAppParam } from '../../lib/app-filter'
 import { applyCaliber, effectiveCaliber, useCaliber } from '../../lib/caliber'
 import { fmtUsd } from '../../lib/money'
 import { DistributionBars } from '../../components/DistributionBars'
+import { FunnelCard, type FunnelStep } from '../../components/FunnelCard'
+import { Icon } from '../../components/Icon'
+import { StackedBars } from '../../components/StackedBars'
 import { EmptyState, ListRow, Section, Skeleton, StatCard } from '../../components/ui'
 
 function TrialFunnel({ data }: { data: TrialCohort[] }) {
@@ -42,6 +48,58 @@ function LtvSection({ data, rate }: { data: CohortRow[]; rate: number }) {
         ))}
       </div>
       <p className="muted hint">LTV = cohort 累计收入 ÷ 订阅者数 · 每周一自动重算</p>
+    </Section>
+  )
+}
+
+function ActivityBars() {
+  const appId = useAppFilter()
+  const { data } = useQuery({
+    queryKey: ['metrics-daily', appId, 30],
+    queryFn: () => api<MetricsDaily[]>(withAppParam('/api/metrics/daily?days=30', appId)),
+  })
+  const byDate = new Map<string, { new_subs: number; renewals: number; refunds: number }>()
+  for (const d of data ?? []) {
+    const a = byDate.get(d.date) ?? { new_subs: 0, renewals: 0, refunds: 0 }
+    a.new_subs += d.new_subs; a.renewals += d.renewals; a.refunds += d.refunds
+    byDate.set(d.date, a)
+  }
+  const days = [...byDate.keys()].sort()
+  if (!days.length) return null
+  const stacked = [
+    { key: 'new_subs', name: '新订', color: 'var(--chart-1)', data: days.map((dt) => byDate.get(dt)!.new_subs) },
+    { key: 'renewals', name: '续费', color: 'var(--chart-4)', data: days.map((dt) => byDate.get(dt)!.renewals) },
+    { key: 'refunds', name: '退款', color: 'var(--chart-neg)', data: days.map((dt) => byDate.get(dt)!.refunds) },
+  ]
+  return (
+    <Section title="近 30 天活动">
+      <div className="panel pad">
+        <div className="compo-legend-inline">
+          {stacked.map((s) => (<span key={s.key}><span className="cli-dot" style={{ background: s.color }} />{s.name}</span>))}
+        </div>
+        <StackedBars series={stacked} height={190} />
+      </div>
+    </Section>
+  )
+}
+
+function ConversionFunnel() {
+  const appId = useAppFilter()
+  const salesQ = useQuery({ queryKey: ['sales-daily', appId, 30], queryFn: () => api<SalesDaily[]>(withAppParam('/api/sales/daily?days=30', appId)) })
+  const trialsQ = useQuery({ queryKey: ['trials', appId], queryFn: () => api<TrialCohort[]>(withAppParam('/api/metrics/trials?weeks=12', appId)) })
+  const downloads = (salesQ.data ?? []).reduce((s, d) => s + d.downloads, 0)
+  const starts = (trialsQ.data ?? []).reduce((s, c) => s + c.starts, 0)
+  const converted = (trialsQ.data ?? []).reduce((s, c) => s + c.converted, 0)
+  const convRate = starts ? Math.round((converted / starts) * 100) : 0
+  if (starts === 0 && downloads === 0) return null
+  const steps: FunnelStep[] = [
+    { label: '下载 · 30 天', value: downloads.toLocaleString(), icon: <Icon name="download" size={18} />, tone: 'info' },
+    { label: '试用开始', value: starts.toLocaleString(), icon: <Icon name="flask" size={18} />, tone: 'violet' },
+    { label: '试用转化', value: converted.toLocaleString(), icon: <Icon name="check" size={18} />, tone: 'success', delta: starts ? { text: `转化率 ${convRate}%`, direction: 'up' } : undefined },
+  ]
+  return (
+    <Section title="转化漏斗">
+      <div className="funnel">{steps.map((s) => <FunnelCard key={s.label} step={s} />)}</div>
     </Section>
   )
 }
@@ -106,6 +164,9 @@ export function RevenueHealth() {
           foot={h ? `Churn ${pct(h.churnRate)}（主动 ${h.churnedVoluntary}/被动 ${h.churnedInvoluntary}）` : undefined}
         />
       </div>
+
+      <ActivityBars />
+      <ConversionFunnel />
 
       {hasTrials && <TrialFunnel data={trialsQ.data!} />}
       {hasCohorts && <LtvSection data={cohortsQ.data!} rate={rate} />}

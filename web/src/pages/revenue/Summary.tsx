@@ -1,23 +1,18 @@
-// 收入 · 概况（对齐 收入分析.dc.html）：
-//   HERO（本月净额 + 今日/30天/ARPU + 收入趋势图）→ KPI 条 →
-//   收入构成（近30天活动 stacked | 收入占比 donut）→ 对账与明细（收入对账 | 按产品）→
-//   下载量 | 转化漏斗
+// 收入 · 概况：HERO（本月净额 + 今日/30天/ARPU + 趋势）→ KPI 条（MRR/新订/续费/退款）
+//   → 收入构成（近30天活动 stacked | 收入占比 donut）→ 下载量
+// 去重：对账归「明细」子页、转化漏斗归「订阅健康」子页、活跃订阅归「订阅健康」
 // 口径徽标不逐处标注——收入页头 CaliberSwitch 已指示当前口径
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  api, type BreakdownRow, type MetricsDaily, type Overview, type Reconciliation,
-  type SalesDaily, type TrialCohort,
+  api, type BreakdownRow, type MetricsDaily, type Overview, type Reconciliation, type SalesDaily,
 } from '../../lib/api'
 import { useAppFilter, withAppParam } from '../../lib/app-filter'
 import { applyCaliber, effectiveCaliber, useCaliber } from '../../lib/caliber'
 import { fmtUsd, fmtUsdCompact } from '../../lib/money'
 import { countryDisplay } from '../../lib/format'
-import { DistributionBars } from '../../components/DistributionBars'
 import { Donut } from '../../components/Donut'
-import { FunnelCard, type FunnelStep } from '../../components/FunnelCard'
-import { Icon } from '../../components/Icon'
 import { KpiCard } from '../../components/Kpi'
 import { StackedBars } from '../../components/StackedBars'
 import { TrendChart } from '../../components/TrendChart'
@@ -134,8 +129,8 @@ function RevenueKpis() {
   return (
     <div className="kpi-strip">
       <KpiCard icon="trendingUp" tone="accent" label="MRR" value={o ? fmtUsd(o.mrrUsdMilli) : '—'} foot={o ? `ARR ${fmtUsd(o.mrrUsdMilli * 12)}` : undefined} />
-      <KpiCard icon="users" tone="teal" label="活跃订阅" value={o ? String(o.activeSubs) : '—'} foot={o ? `试用 ${o.trialSubs} · 风险 ${o.riskSubs}` : undefined} />
-      <KpiCard icon="zap" tone="violet" label="30 天新订" value={String(sum((d) => d.new_subs))} foot={`续费 ${sum((d) => d.renewals)}`} />
+      <KpiCard icon="zap" tone="violet" label="30 天新订" value={String(sum((d) => d.new_subs))} foot="笔数" />
+      <KpiCard icon="refresh" tone="teal" label="30 天续费" value={String(sum((d) => d.renewals))} foot="笔数" />
       <KpiCard icon="trendingDown" tone="danger" label="30 天退款" value={String(sum((d) => d.refunds))} foot="笔数" />
     </div>
   )
@@ -228,132 +223,32 @@ function RevenueComposition({ rate }: { rate: number }) {
   )
 }
 
-/* ---------- 对账与明细：收入对账 | 按产品 ---------- */
-function ReconAndProducts({ rate }: { rate: number }) {
+/* ---------- 下载量（对账归明细页、按产品归上方占比、转化漏斗归订阅健康页，此处不重复）---------- */
+function DownloadsSection() {
   const appId = useAppFilter()
-  const caliber = useCaliber()
-  const reconQ = useQuery({
-    queryKey: ['reconciliation', appId],
-    queryFn: () => api<Reconciliation>(withAppParam('/api/revenue/reconciliation?days=30', appId)),
-  })
-  const breakdownQ = useQuery({
-    queryKey: ['breakdown', appId, 'product'],
-    queryFn: () => api<BreakdownRow[]>(withAppParam('/api/metrics/breakdown?by=product&days=30', appId)),
-  })
-  const s = reconQ.data?.summary
-  const products = breakdownQ.data ?? []
-  const effective = effectiveCaliber(caliber, false)
-  const pTotal = products.reduce((acc, r) => acc + r.usdMilli, 0) || 1
-  const nameOf = (r: BreakdownRow) => r.label ?? r.key.split('.').slice(-2).join('.')
-  if (!s && !products.length) return null
-
-  return (
-    <div className="section-group">
-      <div className="group-label divider"><span>对账与明细</span></div>
-      <div className="two-col">
-        {s && (() => {
-          const reconMax = Math.max(s.eventsUsdMilli, s.estimatedUsdMilli, s.actualUsdMilli, 1)
-          const rows = [
-            { k: '事件口径（流水）', v: s.eventsUsdMilli, c: 'var(--chart-1)' },
-            { k: '预估到账（净额）', v: s.estimatedUsdMilli, c: 'var(--chart-2)' },
-            { k: '实际到账（账单）', v: s.actualUsdMilli, c: 'var(--chart-4)', dash: s.actualUsdMilli <= 0 },
-          ]
-          return (
-            <Section title="收入对账（30 天）">
-              <div className="panel pad">
-                <div className="recon-list">
-                  {rows.map((r) => (
-                    <div className="recon-item" key={r.k}>
-                      <div className="ri-head"><span className="ri-k">{r.k}</span><span className="ri-v num">{r.dash ? '—' : fmtUsd(r.v)}</span></div>
-                      <div className="ri-track"><div className="ri-fill" style={{ width: `${Math.min(100, (r.v / reconMax) * 100)}%`, background: r.c }} /></div>
-                    </div>
-                  ))}
-                </div>
-                <div className="recon-foot">
-                  <span>分成率 <b className="num">{Math.round(s.proceedsRate * 100)}%</b></span>
-                  {s.diffPct != null && (
-                    <span>预估 vs 实际 <b className={`num ${Math.abs(s.diffPct) <= 5 ? 'pos' : 'neg'}`}>{s.diffPct >= 0 ? '+' : ''}{s.diffPct.toFixed(1)}%</b></span>
-                  )}
-                </div>
-              </div>
-            </Section>
-          )
-        })()}
-        {products.length > 0 && (
-          <Section title="按产品（30 天）">
-            <div className="panel pad">
-              <DistributionBars
-                variant="seq"
-                data={products.map((p) => ({
-                  key: p.key,
-                  label: nameOf(p),
-                  value: p.usdMilli,
-                  display: `${fmtUsd(applyCaliber(p.usdMilli, effective, rate))} · ${Math.round((p.usdMilli / pTotal) * 100)}%`,
-                }))}
-              />
-            </div>
-          </Section>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* ---------- 下载量 | 转化漏斗 ---------- */
-function DownloadsAndFunnel() {
-  const appId = useAppFilter()
-  const salesQ = useQuery({
+  const { data: sales } = useQuery({
     queryKey: ['sales-daily', appId, 30],
     queryFn: () => api<SalesDaily[]>(withAppParam('/api/sales/daily?days=30', appId)),
   })
-  const trialsQ = useQuery({
-    queryKey: ['trials', appId],
-    queryFn: () => api<TrialCohort[]>(withAppParam('/api/metrics/trials', appId)),
-  })
-  const sales = salesQ.data ?? []
+  if (!sales?.length) return null
   const downloads = sales.reduce((s, d) => s + d.downloads, 0)
-  const starts = (trialsQ.data ?? []).reduce((s, c) => s + c.starts, 0)
-  const converted = (trialsQ.data ?? []).reduce((s, c) => s + c.converted, 0)
-  const convRate = starts ? Math.round((converted / starts) * 100) : 0
-  const funnelSteps: FunnelStep[] = [
-    { label: '下载 · 30 天', value: downloads.toLocaleString(), icon: <Icon name="download" size={18} />, tone: 'info' },
-    { label: '试用开始', value: starts.toLocaleString(), icon: <Icon name="flask" size={18} />, tone: 'violet' },
-    { label: '试用转化', value: converted.toLocaleString(), icon: <Icon name="check" size={18} />, tone: 'success', delta: starts ? { text: `转化率 ${convRate}%`, direction: 'up' } : undefined },
-  ]
-  const hasFunnel = starts > 0 || downloads > 0
-  const hasSales = sales.length > 0
-
-  if (!hasSales && !hasFunnel) return null
   return (
-    <div className="section-group">
-      <div className="two-col">
-        {hasSales ? (
-          <Section title="下载量">
-            <div className="chart-frame">
-              <div className="head">
-                <span className="total num">{downloads.toLocaleString()}</span>
-                <span className="label">30 天下载 · 账单 T+1</span>
-              </div>
-              <TrendChart
-                type="bar"
-                data={sales.map((d) => ({ date: d.date, value: d.downloads }))}
-                series={[{ key: 'value', name: '下载', color: 'var(--chart-4)' }]}
-                format={(v) => `${v} 次`}
-                axisFormat={(v) => String(v)}
-                height={190}
-              />
-            </div>
-          </Section>
-        ) : null}
-        {hasFunnel && (
-          <Section title="转化漏斗">
-            <div className="funnel">
-              {funnelSteps.map((s) => <FunnelCard key={s.label} step={s} />)}
-            </div>
-          </Section>
-        )}
+    <Section title="下载量" className="mt-4">
+      <div className="chart-frame">
+        <div className="head">
+          <span className="total num">{downloads.toLocaleString()}</span>
+          <span className="label">30 天下载 · 账单 T+1</span>
+        </div>
+        <TrendChart
+          type="bar"
+          data={sales.map((d) => ({ date: d.date, value: d.downloads }))}
+          series={[{ key: 'value', name: '下载', color: 'var(--chart-4)' }]}
+          format={(v) => `${v} 次`}
+          axisFormat={(v) => String(v)}
+          height={190}
+        />
       </div>
-    </div>
+    </Section>
   )
 }
 
@@ -372,8 +267,7 @@ export function RevenueSummary() {
       <RevenueHero rate={rate} />
       <div className="mt-4"><RevenueKpis /></div>
       <RevenueComposition rate={rate} />
-      <ReconAndProducts rate={rate} />
-      <DownloadsAndFunnel />
+      <DownloadsSection />
     </>
   )
 }

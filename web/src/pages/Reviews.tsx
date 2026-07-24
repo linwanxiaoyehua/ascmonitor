@@ -102,15 +102,16 @@ function RatingOverview() {
     <div className="rating-overview panel pad mb-3">
       {/* 平均分 */}
       <div className="ro-avg">
+        <div className="ro-col-title">平均评分</div>
         <div className="ro-avg-num">
           <span className="num">{avg.toFixed(1)}</span>
           <span className="ro-slash">/5</span>
         </div>
         <Stars rating={Math.round(avg)} />
         <div className="ro-avg-sub">
-          共 {count.toLocaleString()} 个评分
+          共 {count.toLocaleString()} 个评分 · 近 30 天
           {delta != null && Math.abs(delta) >= 0.005 && (
-            <b className={delta > 0 ? 'delta-up' : 'delta-down'}> {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(2)} / 7天</b>
+            <b className={delta > 0 ? 'delta-up' : 'delta-down'}> {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(2)}</b>
           )}
         </div>
       </div>

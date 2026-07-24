@@ -31,7 +31,7 @@ function TodaySummary() {
       {cells.map((c) => (
         <div className="as-cell" key={c.label}>
           <div className="as-head"><span className={`stat-ic tone-${c.tone}`}><Icon name={c.icon} size={14} /></span>{c.label}</div>
-          <div className="as-value num">{c.value}</div>
+          <div className={`as-value num tone-${c.tone}`}>{c.value}</div>
         </div>
       ))}
     </div>
@@ -131,7 +131,7 @@ export function ActivityPage() {
                     className={`day-total num${total.usdMilli < 0 ? ' neg' : ''}`}
                     title={`当日 ${total.count} 笔收入 / 退款事件合计（已折算 USD）`}
                   >
-                    {total.usdMilli < 0 ? '−' : '+'}{fmtUsd(Math.abs(total.usdMilli))}
+                    净 {total.usdMilli < 0 ? '−' : '+'}{fmtUsd(Math.abs(total.usdMilli))}
                   </span>
                 )}
               </div>

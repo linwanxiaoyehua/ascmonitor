@@ -14,6 +14,7 @@ import { useAppFilter, withAppParam } from '../../lib/app-filter'
 import { applyCaliber, effectiveCaliber, useCaliber } from '../../lib/caliber'
 import { fmtUsd, fmtUsdCompact } from '../../lib/money'
 import { countryDisplay } from '../../lib/format'
+import { DistributionBars } from '../../components/DistributionBars'
 import { Donut } from '../../components/Donut'
 import { FunnelCard, type FunnelStep } from '../../components/FunnelCard'
 import { Icon } from '../../components/Icon'
@@ -250,32 +251,46 @@ function ReconAndProducts({ rate }: { rate: number }) {
     <div className="section-group">
       <div className="group-label divider"><span>对账与明细</span></div>
       <div className="two-col">
-        {s && (
-          <Section title="收入对账（30 天）">
-            <div className="panel pad">
-              <div className="recon-row"><span className="k">事件口径（流水）</span><span className="num">{fmtUsd(s.eventsUsdMilli)}</span></div>
-              <div className="recon-row"><span className="k">预估到账（净额）</span><span className="num">{fmtUsd(s.estimatedUsdMilli)}</span></div>
-              <div className="recon-row total"><span className="k">实际到账（账单）</span><span className="num">{s.actualUsdMilli > 0 ? fmtUsd(s.actualUsdMilli) : '—'}</span></div>
-              <div className="recon-row"><span className="k">分成率</span><span className="num">{Math.round(s.proceedsRate * 100)}%</span></div>
-              {s.diffPct != null && (
-                <div className="recon-row"><span className="k">预估 vs 实际差异</span><span className={`num ${Math.abs(s.diffPct) <= 5 ? 'pos' : 'neg'}`}>{s.diffPct >= 0 ? '+' : ''}{s.diffPct.toFixed(1)}%</span></div>
-              )}
-            </div>
-          </Section>
-        )}
+        {s && (() => {
+          const reconMax = Math.max(s.eventsUsdMilli, s.estimatedUsdMilli, s.actualUsdMilli, 1)
+          const rows = [
+            { k: '事件口径（流水）', v: s.eventsUsdMilli, c: 'var(--chart-1)' },
+            { k: '预估到账（净额）', v: s.estimatedUsdMilli, c: 'var(--chart-2)' },
+            { k: '实际到账（账单）', v: s.actualUsdMilli, c: 'var(--chart-4)', dash: s.actualUsdMilli <= 0 },
+          ]
+          return (
+            <Section title="收入对账（30 天）">
+              <div className="panel pad">
+                <div className="recon-list">
+                  {rows.map((r) => (
+                    <div className="recon-item" key={r.k}>
+                      <div className="ri-head"><span className="ri-k">{r.k}</span><span className="ri-v num">{r.dash ? '—' : fmtUsd(r.v)}</span></div>
+                      <div className="ri-track"><div className="ri-fill" style={{ width: `${Math.min(100, (r.v / reconMax) * 100)}%`, background: r.c }} /></div>
+                    </div>
+                  ))}
+                </div>
+                <div className="recon-foot">
+                  <span>分成率 <b className="num">{Math.round(s.proceedsRate * 100)}%</b></span>
+                  {s.diffPct != null && (
+                    <span>预估 vs 实际 <b className={`num ${Math.abs(s.diffPct) <= 5 ? 'pos' : 'neg'}`}>{s.diffPct >= 0 ? '+' : ''}{s.diffPct.toFixed(1)}%</b></span>
+                  )}
+                </div>
+              </div>
+            </Section>
+          )
+        })()}
         {products.length > 0 && (
           <Section title="按产品（30 天）">
             <div className="panel pad">
-              <ul className="prod-list">
-                {products.map((p, i) => (
-                  <li key={p.key}>
-                    <span className="pl-dot" style={{ background: SEQ_COLORS[i % SEQ_COLORS.length] }} />
-                    <span className="pl-name">{nameOf(p)}</span>
-                    <span className="pl-val num">{fmtUsd(applyCaliber(p.usdMilli, effective, rate))}</span>
-                    <span className="pl-pct num">{Math.round((p.usdMilli / pTotal) * 100)}%</span>
-                  </li>
-                ))}
-              </ul>
+              <DistributionBars
+                variant="seq"
+                data={products.map((p) => ({
+                  key: p.key,
+                  label: nameOf(p),
+                  value: p.usdMilli,
+                  display: `${fmtUsd(applyCaliber(p.usdMilli, effective, rate))} · ${Math.round((p.usdMilli / pTotal) * 100)}%`,
+                }))}
+              />
             </div>
           </Section>
         )}
@@ -320,7 +335,7 @@ function DownloadsAndFunnel() {
                 <span className="label">30 天下载 · 账单 T+1</span>
               </div>
               <TrendChart
-                type="area"
+                type="bar"
                 data={sales.map((d) => ({ date: d.date, value: d.downloads }))}
                 series={[{ key: 'value', name: '下载', color: 'var(--chart-4)' }]}
                 format={(v) => `${v} 次`}

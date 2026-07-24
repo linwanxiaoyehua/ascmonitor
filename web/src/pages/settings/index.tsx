@@ -9,11 +9,12 @@
 import { useState } from 'react'
 import { useParams } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
-import { api, type AppRow, type DataHealth } from '../../lib/api'
+import { api, clearToken, getToken, type AppRow, type DataHealth } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
+import { toast } from '../../lib/toast'
 import { getTheme, setTheme, type Theme } from '../../lib/theme'
 import { Icon } from '../../components/Icon'
-import { ListRow, PageHeader, Section, SegmentedControl } from '../../components/ui'
+import { ListRow, PageHeader, Section } from '../../components/ui'
 
 /** 数据管道状态卡（对齐 设置.dc.html 顶部）：管道健康 + 接入 App / 原始事件 */
 function DataPipelineCard() {
@@ -47,14 +48,66 @@ import { AlertsSection } from './Alerts'
 import { BuildsSection } from './Builds'
 import { DataSection } from './Data'
 
-const THEME_OPTIONS: Array<{ value: Theme; label: string }> = [
-  { value: 'auto', label: '跟随系统' },
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-]
+/** 账户与安全：Access Token（掩码显示 + 复制 + 退出登录），对齐 设置.dc.html 末尾 */
+function AccountSection() {
+  const token = getToken() ?? ''
+  const masked = token ? `asc_${'•'.repeat(16)}${token.slice(-4)}` : '未登录'
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(token); toast.success('已复制 Access Token') } catch { /* http 无剪贴板权限 */ }
+  }
+  const logout = () => { clearToken(); location.reload() }
+  return (
+    <Section title="账户与安全">
+      <div className="list">
+        <ListRow
+          leading={<span className="row-icon tone-accent"><Icon name="key" size={16} /></span>}
+          title="Access Token"
+          detail={masked}
+          trailing={<span className="row-action-text">复制</span>}
+          onPress={copy}
+        />
+        <ListRow
+          leading={<span className="row-icon tone-danger"><Icon name="x" size={16} /></span>}
+          title={<span className="neg">退出登录（清除本机 Token）</span>}
+          onPress={logout}
+        />
+      </div>
+      <p className="muted hint">Token 存于本机浏览器；退出后需重新粘贴才能访问。</p>
+    </Section>
+  )
+}
+
+/** 主题选择：3 张预览色卡 + 选中 ✓（对齐 设置.dc.html 外观） */
+function ThemePicker() {
+  const [theme, setThemeState] = useState<Theme>(getTheme())
+  const opts: Array<{ value: Theme; label: string; preview: string }> = [
+    { value: 'auto', label: '跟随系统', preview: 'auto' },
+    { value: 'light', label: '浅色', preview: 'light' },
+    { value: 'dark', label: '深色', preview: 'dark' },
+  ]
+  return (
+    <div className="theme-picker">
+      {opts.map((o) => (
+        <button
+          key={o.value}
+          className={`theme-card${theme === o.value ? ' active' : ''}`}
+          aria-pressed={theme === o.value}
+          onClick={() => { setTheme(o.value); setThemeState(o.value) }}
+        >
+          <span className={`theme-preview preview-${o.preview}`} aria-hidden="true">
+            <span className="tp-bar" /><span className="tp-bar sm" /><span className="tp-dot" />
+          </span>
+          <span className="theme-label">
+            {o.label}
+            {theme === o.value && <Icon name="check" size={14} />}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function SettingsHome() {
-  const [theme, setThemeState] = useState<Theme>(getTheme())
 
   return (
     <div className="narrow">
@@ -72,18 +125,13 @@ function SettingsHome() {
 
       {/* 外观（对齐设计稿，靠近底部） */}
       <Section title="外观">
-        <div className="pref-row">
-          <span className="pref-label">主题</span>
-          <div className="pref-control">
-            <SegmentedControl
-              label="外观"
-              options={THEME_OPTIONS}
-              value={theme}
-              onChange={(t) => { setTheme(t); setThemeState(t) }}
-            />
-          </div>
+        <div className="panel pad">
+          <ThemePicker />
         </div>
       </Section>
+
+      {/* 账户与安全 */}
+      <AccountSection />
 
       <Section title="关于">
         <div className="list">

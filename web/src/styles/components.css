@@ -1455,3 +1455,54 @@ button.kpi-card { cursor: pointer; }
 .pipe-card .pipe-stats { display: flex; gap: var(--s5); flex: none; }
 .pipe-card .pipe-stats .ps-v { font-size: var(--fs-7); font-weight: var(--fw-bold); color: var(--text-1); letter-spacing: -0.01em; text-align: right; }
 .pipe-card .pipe-stats .ps-k { font-size: var(--fs-1); color: var(--text-3); text-align: right; }
+
+
+/* ============ 设计走查修复批次 ============ */
+
+/* 收入对账：每行占比进度条（R1） */
+.recon-list { display: flex; flex-direction: column; gap: var(--s3); }
+.recon-item .ri-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s1-5); }
+.recon-item .ri-k { font-size: var(--fs-3); color: var(--text-2); }
+.recon-item .ri-v { font-size: var(--fs-4); font-weight: var(--fw-semi); color: var(--text-1); }
+.recon-item .ri-track { height: var(--s2); border-radius: var(--radius-xs); background: var(--bg-inset); overflow: hidden; }
+.recon-item .ri-fill { height: 100%; border-radius: var(--radius-xs); transition: width var(--dur) var(--ease); }
+.recon-foot { display: flex; gap: var(--s4); margin-top: var(--s3-5); padding-top: var(--s3); border-top: 1px solid var(--border-subtle); font-size: var(--fs-3); color: var(--text-2); flex-wrap: wrap; }
+.recon-foot b { color: var(--text-1); font-weight: var(--fw-semi); margin-left: var(--s1); }
+.recon-foot b.pos { color: var(--success); }
+.recon-foot b.neg { color: var(--danger); }
+
+/* 评论流桌面两列（V2） */
+@media (min-width: 1024px) {
+  .review-list { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); align-items: start; }
+}
+
+/* 动态：subtype 周期彩色药丸（A2） */
+.lrow .title .sub-pill {
+  font-size: var(--fs-1); font-weight: var(--fw-semi);
+  color: var(--accent-text); background: var(--accent-soft);
+  padding: 1px var(--s2); border-radius: var(--radius-pill); white-space: nowrap;
+}
+
+/* 动态：今日汇总条数值配色（A1） */
+.act-summary .as-value.tone-success { color: var(--success); }
+.act-summary .as-value.tone-danger { color: var(--danger); }
+.act-summary .as-value.tone-accent { color: var(--accent-text); }
+.act-summary .as-value.tone-info { color: var(--info); }
+
+/* 动态：按天分组头日期加亮（A4） */
+.day-group .group-label > span:first-child { font-size: var(--fs-4); font-weight: var(--fw-bold); color: var(--text-1); }
+
+/* 设置：主题预览色卡（S4，对齐 设置.dc.html 外观） */
+.theme-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s3); }
+.theme-picker .theme-card { display: flex; flex-direction: column; gap: var(--s2); padding: 0; background: none; border: none; cursor: pointer; font-family: inherit; }
+.theme-picker .theme-preview { position: relative; height: 62px; border-radius: var(--radius-control); border: 1px solid var(--border-subtle); overflow: hidden; transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.theme-picker .theme-card.active .theme-preview { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.theme-picker .preview-light { background: #f4f7fc; }
+.theme-picker .preview-dark { background: #080b13; }
+.theme-picker .preview-auto { background: linear-gradient(115deg, #f4f7fc 0 50%, #080b13 50% 100%); }
+.theme-picker .tp-bar { position: absolute; left: 9px; top: 12px; width: 58%; height: 7px; border-radius: 4px; background: rgba(130, 130, 150, 0.4); }
+.theme-picker .tp-bar.sm { top: 24px; width: 38%; height: 6px; opacity: 0.65; }
+.theme-picker .tp-dot { position: absolute; left: 9px; bottom: 9px; width: 18px; height: 18px; border-radius: 6px; background: #6366f1; }
+.theme-picker .theme-label { display: flex; align-items: center; gap: var(--s1); font-size: var(--fs-3); font-weight: var(--fw-medium); color: var(--text-2); }
+.theme-picker .theme-card.active .theme-label { color: var(--text-1); font-weight: var(--fw-semi); }
+.theme-picker .theme-label svg { color: var(--accent); }

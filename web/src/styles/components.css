@@ -176,8 +176,10 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
   .shell-content.title-in-bar .page-header > .subtitle { display: none; }
   /* 无操作、无返回的页头（总览/评分/设置主页）：整块收起，别留空白 */
   .shell-content.title-in-bar .page-header:not(.sub):not(.has-actions) { display: block; padding: 0; }
-  /* 带操作的页头（收入的口径切换）：只右对齐操作区 */
-  .shell-content.title-in-bar .page-header.has-actions { justify-content: flex-end; padding: var(--s2) 0; }
+  /* 带操作的页头（收入的口径切换）：标题已上顶栏 → 操作区撑满整宽，
+     与下方子页签（.subnav）同宽对齐，避免右浮窄块与满宽子页签左右错位 */
+  .shell-content.title-in-bar .page-header.has-actions { display: block; padding: var(--s3) 0 0; }
+  .shell-content.title-in-bar .page-header.has-actions .actions { display: block; margin: 0; }
   /* SubPage：只剩返回按钮，单独成行置顶 */
   .shell-content.title-in-bar .page-header.sub { padding: var(--s2) 0; }
 }
@@ -803,7 +805,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 .day-group { margin-top: var(--s4); }
 
 /* ---- 页内子页签（移动端；桌面由侧边栏二级导航接管） ---- */
-.subnav { margin-top: var(--s2); }
+/* 上下都留白：与上方口径切换、下方卡片区分开，避免几个控件框贴在一起 */
+.subnav { margin: var(--s3) 0; }
 .subnav .segmented button, .subnav .segmented a { min-height: 36px; }
 
 /* ---- 对账明细行 ---- */

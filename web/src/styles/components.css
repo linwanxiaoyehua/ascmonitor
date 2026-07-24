@@ -52,7 +52,7 @@ button.primary:disabled { background: var(--accent); box-shadow: none; }
   max-width: var(--w-main);
   margin: 0 auto;
   /* 底部留白清过悬浮胶囊底栏（脱离边缘 + 胶囊高度） */
-  padding: var(--s3) var(--s4) calc(104px + env(safe-area-inset-bottom));
+  padding: var(--s3) var(--s4) calc(96px + env(safe-area-inset-bottom));
 }
 
 /* ---- TopBar（毛玻璃固定顶栏） ---- */
@@ -509,10 +509,10 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   max-width: 420px;
   display: flex; justify-content: space-around;
   /* 比共享 --bar-bg 更透，配强 blur/saturate 才有"液态玻璃"透光感（仍保 11px 标签可读） */
-  background: light-dark(rgba(246, 246, 248, 0.72), rgba(16, 16, 24, 0.66));
+  background: light-dark(rgba(246, 246, 248, 0.6), rgba(16, 16, 24, 0.54));
   -webkit-backdrop-filter: saturate(190%) blur(24px);
   backdrop-filter: saturate(190%) blur(24px);
-  padding: var(--s1-5) var(--s2);
+  padding: var(--s1) var(--s2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   box-shadow:
@@ -525,9 +525,9 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
   font-size: var(--fs-1);
   font-weight: var(--fw-medium);
   display: flex; flex-direction: column; align-items: center; gap: var(--s1);
-  /* 内边距加高，配 24px 图标让胶囊不显扁（iOS 26 观感） */
-  padding: var(--s2-5) var(--s2);
-  min-width: 60px; min-height: var(--tap);
+  /* 纵向内边距适中（别太高），横向加大让选中高亮胶囊更宽 */
+  padding: var(--s2) var(--s3);
+  min-width: 68px; min-height: var(--tap);
   text-decoration: none;
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
@@ -881,7 +881,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.98); 
 
 /* ============ 平板 / 中等窗口（≥768px） ============ */
 @media (min-width: 768px) {
-  .shell-main { max-width: var(--w-narrow-lg); padding: var(--s4) var(--s5) calc(104px + env(safe-area-inset-bottom)); }
+  .shell-main { max-width: var(--w-narrow-lg); padding: var(--s4) var(--s5) calc(96px + env(safe-area-inset-bottom)); }
   .topbar-inner { max-width: var(--w-narrow-lg); }
 
   /* Sheet：底部抽屉 → 居中弹窗（平板上抽屉横向拉太宽） */

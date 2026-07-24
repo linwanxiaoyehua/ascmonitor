@@ -21,11 +21,6 @@ export interface NavTab {
   children?: NavChild[]
 }
 
-export const OVERVIEW_SUBS: NavChild[] = [
-  { path: '/', label: '概况' },
-  { path: '/activity', label: '实时动态' },
-]
-
 export const REVENUE_SUBS: NavChild[] = [
   { path: '/revenue', label: '概况' },
   { path: '/revenue/health', label: '订阅健康' },
@@ -40,11 +35,12 @@ export const SETTINGS_SUBS: NavChild[] = [
   { path: '/settings/data', label: '数据运维', detail: '手动抓取评论 / 账单', icon: 'wrench', tone: 'success' },
 ]
 
-// 4 tab：实时动态并入总览（作为其二级页），订阅并入收入子页签
+// 5 tab：实时动态升为独立 tab；订阅并入收入子页签
 export const TABS: NavTab[] = [
-  { path: '/', label: '总览', icon: 'chart', owns: ['/', '/activity'], children: OVERVIEW_SUBS },
+  { path: '/', label: '总览', icon: 'chart', owns: ['/'] },
   { path: '/revenue', label: '收入', icon: 'creditCard', owns: ['/revenue'], children: REVENUE_SUBS },
   { path: '/reviews', label: '评分', icon: 'star', owns: ['/reviews'] },
+  { path: '/activity', label: '动态', icon: 'activity', owns: ['/activity'] },
   { path: '/settings', label: '设置', icon: 'settings', owns: ['/settings'], children: SETTINGS_SUBS },
 ]
 

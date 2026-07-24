@@ -2,6 +2,7 @@
 // KPI 行 → 差评醒目卡 → [实时动态流 | 收入趋势+下载+口碑] → 多 App 分列概览
 // 全局口径只读消费（开关在收入页头）；收入类不重复标口径，数据新鲜度（ASC 快照）保留角标
 
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useLocation } from 'wouter'
 import {
@@ -22,6 +23,18 @@ import { CaliberTag, EmptyState, ErrorState, PageHeader, Section, Skeleton } fro
 
 function yesterdayStr(): string {
   return new Date(Date.now() - 86400_000).toISOString().slice(0, 10)
+}
+
+/** 视口是否为手机（<768px）——hero 趋势图在手机上用更矮的高度 */
+function useIsMobile(): boolean {
+  const [m, setM] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const h = () => setM(mq.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  return m
 }
 
 /** 多 App 分列概览（全部 Apps 且 App>1 时）：每 App 一行关键数 */
@@ -119,6 +132,8 @@ export function OverviewPage() {
   const appId = useAppFilter()
   const caliber = useCaliber()
   const [, navigate] = useLocation()
+  const isMobile = useIsMobile()
+  const heroChartH = isMobile ? 92 : 150
 
   const overviewQ = useQuery({
     queryKey: ['overview', appId],
@@ -231,7 +246,7 @@ export function OverviewPage() {
       {overviewQ.isPending || !o ? (
         <div className="skeleton h-hero span-full" aria-hidden="true" />
       ) : (
-        <section className="cmd-hero span-full">
+        <section className="cmd-hero ov-hero span-full">
           <div className="ch-main">
             <div className="ch-head">
               <span className="stat-ic tone-success"><Icon name="dollar" size={17} /></span>
@@ -259,7 +274,7 @@ export function OverviewPage() {
             </div>
             <div className="ch-chart-body">
               {metricsQ.isPending ? (
-                <Skeleton variant="chart" height={172} />
+                <Skeleton variant="chart" height={heroChartH} />
               ) : (
                 <TrendChart
                   type="area"
@@ -267,7 +282,7 @@ export function OverviewPage() {
                   series={[{ key: 'value', name: '收入', color: 'var(--chart-2)' }]}
                   format={fmtUsd}
                   axisFormat={fmtUsdCompact}
-                  height={172}
+                  height={heroChartH}
                 />
               )}
             </div>
@@ -338,29 +353,8 @@ export function OverviewPage() {
         )}
       </Section>
 
-      {/* 右列：收入趋势缩略 + 下载量 */}
+      {/* 右列：下载量 + 评分分布（收入趋势已并入 HERO，不再重复） */}
       <div className="col-stack">
-        <Section title="收入趋势" action={{ label: '收入分析', onPress: () => navigate('/revenue') }}>
-          <div className="chart-frame">
-            <div className="head">
-              <span className="total num">{fmtUsd(trendTotal)}</span>
-              <span className="label">30 天合计{trendCaliber === 'billed' ? ' · 账单' : ''}</span>
-            </div>
-            {metricsQ.isPending ? (
-              <Skeleton variant="chart" height={170} />
-            ) : (
-              <TrendChart
-                type="area"
-                data={trendData}
-                series={[{ key: 'value', name: '收入', color: 'var(--chart-2)' }]}
-                format={fmtUsd}
-                axisFormat={fmtUsdCompact}
-                height={170}
-              />
-            )}
-          </div>
-        </Section>
-
         {(salesQ.data?.length ?? 0) > 0 && (
           <Section title="下载量">
             <div className="chart-frame">
@@ -379,27 +373,23 @@ export function OverviewPage() {
             </div>
           </Section>
         )}
+        <RatingDistCard appId={appId} onOpen={() => navigate('/reviews')} />
       </div>
 
       {/* ===== 健康度与口碑 ===== */}
       <div className="group-label divider span-full"><span>健康度与口碑</span></div>
-
-      {/* 订阅健康环形（桌面左列） */}
-      <Section title="订阅健康" action={{ label: '订阅明细', onPress: () => navigate('/revenue/detail') }}>
-        {overviewQ.isPending || !o ? (
-          <Skeleton variant="chart" height={196} />
-        ) : (
-          <SubHealthCard o={o} />
-        )}
-      </Section>
-
-      {/* 评分分布（桌面右列） */}
-      <div className="col-stack">
-        <RatingDistCard appId={appId} onOpen={() => navigate('/reviews')} />
+      <div className="two-col span-full">
+        {/* 订阅健康环形 */}
+        <Section title="订阅健康" action={{ label: '订阅明细', onPress: () => navigate('/revenue/detail') }}>
+          {overviewQ.isPending || !o ? (
+            <Skeleton variant="chart" height={196} />
+          ) : (
+            <SubHealthCard o={o} />
+          )}
+        </Section>
+        {/* 各 App 分列概览（全部 Apps 模式） */}
+        {appId == null && <MultiAppOverview />}
       </div>
-
-      {/* 多 App 分列概览（全部 Apps 模式） */}
-      {appId == null && <MultiAppOverview />}
     </div>
   )
 }

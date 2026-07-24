@@ -91,7 +91,7 @@ function HealthSection() {
   )
 }
 
-export function DataSection() {
+export function DataSection({ embedded = false }: { embedded?: boolean } = {}) {
   const [running, setRunning] = useState<string | null>(null)
 
   const run = async (kind: 'reviews' | 'sales' | 'products') => {
@@ -117,8 +117,8 @@ export function DataSection() {
     }
   }
 
-  return (
-    <SubPage title="数据运维" backTo="/settings" backLabel="返回设置">
+  const inner = (
+    <>
       <Section title="数据健康">
         <HealthSection />
       </Section>
@@ -147,6 +147,7 @@ export function DataSection() {
           />
         </div>
       </Section>
-    </SubPage>
+    </>
   )
+  return embedded ? inner : <SubPage title="数据运维" backTo="/settings" backLabel="返回设置">{inner}</SubPage>
 }

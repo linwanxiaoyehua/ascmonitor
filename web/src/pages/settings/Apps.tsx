@@ -10,7 +10,7 @@ import { Sheet } from '../../components/Sheet'
 import { ListRow, Section, Skeleton } from '../../components/ui'
 import { SubPage } from '../../components/SubPage'
 
-export function AppsSection() {
+export function AppsSection({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient()
   const { data: apps, isPending } = useQuery({ queryKey: ['apps'], queryFn: () => api<AppRow[]>('/api/apps') })
   const [editing, setEditing] = useState<AppRow | null>(null)
@@ -57,8 +57,8 @@ export function AppsSection() {
     },
   })
 
-  return (
-    <SubPage title="App 管理" backTo="/settings" backLabel="返回设置">
+  const inner = (
+    <>
       <Section title="App 列表">
         {isPending ? (
           <Skeleton variant="rows" count={2} />
@@ -119,6 +119,7 @@ export function AppsSection() {
           {addMutation.isPending ? '添加中…' : '添加'}
         </button>
       </Sheet>
-    </SubPage>
+    </>
   )
+  return embedded ? inner : <SubPage title="App 管理" backTo="/settings" backLabel="返回设置">{inner}</SubPage>
 }

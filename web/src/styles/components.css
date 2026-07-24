@@ -539,7 +539,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.985);
   /* 更靠底：压进安全区，仅在 Home Indicator 之上留一点 */
   bottom: max(var(--s1), calc(env(safe-area-inset-bottom) - var(--s5)));
   width: calc(100% - var(--s3) * 2);
-  max-width: 420px;
+  max-width: 380px;
   display: flex; justify-content: space-around;
   /* 液态玻璃材质（WebKit 可生效，不依赖 Safari 不支持的 SVG 折射）：
      ① 斜向白渐变 = 表面光泽/反光方向；② 半透底色 = 玻璃本体 tint；
@@ -585,7 +585,7 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.985);
   /* 底栏横向 padding=0 → 槽宽正好 25%，末端槽紧贴底栏边；
      胶囊两侧只内缩 s1，故末端 tab 选中时胶囊外沿贴着底栏边（胶囊应有的性状） */
   left: 0; top: var(--s0-5); bottom: var(--s0-5); /* 纵向铺满，上下贴近底栏分栏 */
-  width: 25%;
+  width: calc(100% / var(--tab-count, 5));
   transform: translateX(calc(var(--active-tab, 0) * 100%));
   transition: transform 0.4s cubic-bezier(0.34, 1.5, 0.4, 1); /* iOS 弹性吸附 */
   z-index: -1;
@@ -1164,15 +1164,8 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.985);
    仅两处“可选”结构增强需在 JSX 加一个 class，见文末注释与 README。
    ============================================================ */
 
-/* ① 页面背景极光 —— 让首屏不再是纯平底色，指挥中心氛围的关键一笔。
-   两层 radial + 固定附着；浅色下极淡、暗色下品牌辉光。 */
-body {
-  background:
-    radial-gradient(1200px 600px at 78% -8%, var(--glow-1), transparent 60%),
-    radial-gradient(900px 520px at -6% 4%, var(--glow-2), transparent 55%),
-    var(--bg-app);
-  background-attachment: fixed;
-}
+/* ① 页面背景：纯 --bg-app —— 去掉极光渐变，顶栏毛玻璃(bar-bg=bg-app 半透明)与页面无缝衔接 */
+body { background: var(--bg-app); }
 
 /* ② hero KPI 卡 —— 更强的视觉焦点：品牌渐变 + 发光投影 + 巨字号。
    覆盖你现有 .stat-card.hero（同名，权重相同，靠后声明胜出）。 */
@@ -1305,11 +1298,7 @@ body {
   position: relative; overflow: hidden;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(135deg,
-      light-dark(rgba(99, 102, 241, 0.10), rgba(99, 102, 241, 0.16)),
-      light-dark(rgba(34, 211, 238, 0.03), rgba(34, 211, 238, 0.05)) 55%,
-      var(--bg-surface));
+  background: var(--bg-surface);
   box-shadow: var(--shadow-card);
   display: grid; grid-template-columns: 1fr;
 }
@@ -1337,6 +1326,20 @@ body {
   .ch-main { padding: var(--s6) var(--s7); }
   .ch-chart { border-top: none; padding: var(--s5) var(--s6) var(--s4); }
   .ch-chart-body { min-height: 172px; }
+}
+/* 手机端：总览 hero 也走两列（左文右图），压缩高度 —— 收入页 hero 不受影响 */
+@media (max-width: 767px) {
+  .cmd-hero.ov-hero { grid-template-columns: minmax(0, 1fr) minmax(108px, 0.82fr); align-items: stretch; }
+  .ov-hero .ch-main { padding: var(--s4) var(--s3-5); }
+  .ov-hero .ch-label { font-size: var(--fs-2); }
+  .ov-hero .ch-value { font-size: clamp(26px, 7vw, 40px); margin: var(--s2) 0 var(--s1); }
+  .ov-hero .ch-foots { gap: var(--s2-5); }
+  .ov-hero .ch-foots span { font-size: var(--fs-1); }
+  .ov-hero .ch-actions { display: none; }
+  .ov-hero .ch-chart { border-top: none; padding: var(--s4) var(--s3-5) var(--s4) 0; }
+  .ov-hero .ch-chart-head { flex-direction: column; align-items: flex-start; gap: 0; font-size: var(--fs-1); }
+  .ov-hero .ch-chart-head .cc-total { margin-top: 1px; }
+  .ov-hero .ch-chart-body { min-height: 96px; }
 }
 
 /* ---- KPI STRIP ---- */

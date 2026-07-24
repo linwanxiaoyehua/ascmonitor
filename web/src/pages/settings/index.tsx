@@ -7,11 +7,10 @@
 // 告警 tab 已解散：规则配置归此处，历史归动态页
 
 import { useState } from 'react'
-import { useLocation, useParams } from 'wouter'
+import { useParams } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
 import { api, type AppRow, type DataHealth } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
-import { SETTINGS_SUBS } from '../../lib/nav'
 import { getTheme, setTheme, type Theme } from '../../lib/theme'
 import { Icon } from '../../components/Icon'
 import { ListRow, PageHeader, Section, SegmentedControl } from '../../components/ui'
@@ -55,18 +54,19 @@ const THEME_OPTIONS: Array<{ value: Theme; label: string }> = [
 ]
 
 function SettingsHome() {
-  const [, navigate] = useLocation()
   const [theme, setThemeState] = useState<Theme>(getTheme())
 
   return (
     <div className="narrow">
       <PageHeader title="设置" />
 
+      {/* 数据管道状态 */}
       <DataPipelineCard />
 
-      <Section title="偏好">
+      {/* 外观 */}
+      <Section title="外观">
         <div className="pref-row">
-          <span className="pref-label">外观</span>
+          <span className="pref-label">主题</span>
           <div className="pref-control">
             <SegmentedControl
               label="外观"
@@ -78,20 +78,12 @@ function SettingsHome() {
         </div>
       </Section>
 
-      <Section title="配置">
-        <div className="list">
-          {SETTINGS_SUBS.map((s) => (
-            <ListRow
-              key={s.path}
-              leading={<span className={`row-icon tone-${s.tone}`}>{s.icon && <Icon name={s.icon} size={16} />}</span>}
-              title={s.label}
-              detail={s.detail}
-              trailing="chevron"
-              onPress={() => navigate(s.path)}
-            />
-          ))}
-        </div>
-      </Section>
+      {/* 全部配置内联为单长页（对齐 设置.dc.html）；子路由仍保留供深链/侧边栏 */}
+      <AlertsSection embedded />
+      <AppsSection embedded />
+      <ConnectSection embedded />
+      <DataSection embedded />
+      <BuildsSection embedded />
 
       <Section title="关于">
         <div className="list">

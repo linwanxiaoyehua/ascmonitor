@@ -172,7 +172,7 @@ function NavTree({ location }: { location: string }) {
 
   const dragging = drag != null
   const shownIndex = dragging ? Math.round(drag) : activeIndex // 拖动中高亮胶囊所在 tab
-  const style = { '--active-tab': activeIndex, ...(dragging ? { '--drag-index': drag } : null) } as CSSProperties
+  const style = { '--active-tab': activeIndex, '--tab-count': TABS.length, ...(dragging ? { '--drag-index': drag } : null) } as CSSProperties
 
   return (
     <nav

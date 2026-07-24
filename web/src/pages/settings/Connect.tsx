@@ -8,7 +8,7 @@ import { Icon } from '../../components/Icon'
 import { ListRow, Section } from '../../components/ui'
 import { SubPage } from '../../components/SubPage'
 
-export function ConnectSection() {
+export function ConnectSection({ embedded = false }: { embedded?: boolean } = {}) {
   const [copied, setCopied] = useState(false)
   const url = `${location.origin}/webhook/assn`
   const { data: configKeys } = useQuery({ queryKey: ['config-keys'], queryFn: () => api<string[]>('/api/config') })
@@ -46,8 +46,8 @@ export function ConnectSection() {
 
   const ascConfigured = (configKeys ?? []).filter((k) => k.startsWith('asc_')).length >= 3
 
-  return (
-    <SubPage title="接入与凭证" backTo="/settings" backLabel="返回设置">
+  const inner = (
+    <>
       <Section title="App Store 服务器通知">
         <div className="list">
           <ListRow
@@ -87,6 +87,7 @@ export function ConnectSection() {
           {ascConfigured ? '已配置（用于拉取可回复评论与账单报告；敏感值只写不读回）' : '未配置（可选，用于拉取可回复评论与账单报告）'}
         </p>
       </Section>
-    </SubPage>
+    </>
   )
+  return embedded ? inner : <SubPage title="接入与凭证" backTo="/settings" backLabel="返回设置">{inner}</SubPage>
 }

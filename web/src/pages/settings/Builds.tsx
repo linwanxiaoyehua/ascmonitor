@@ -138,9 +138,9 @@ function StatusRows() {
   )
 }
 
-export function BuildsSection() {
-  return (
-    <SubPage title="构建监控" backTo="/settings" backLabel="返回设置">
+export function BuildsSection({ embedded = false }: { embedded?: boolean } = {}) {
+  const inner = (
+    <>
       <Section title="当前状态">
         <StatusRows />
       </Section>
@@ -152,6 +152,7 @@ export function BuildsSection() {
         注册后 App Store Connect 会在构建上传、TestFlight 审核、上架审核状态变化时实时回调；
         每日还会拉取一次真实状态对账，防止漏投。每个 App 单独注册，Apple 侧上限 10 个。
       </p>
-    </SubPage>
+    </>
   )
+  return embedded ? inner : <SubPage title="构建监控" backTo="/settings" backLabel="返回设置">{inner}</SubPage>
 }

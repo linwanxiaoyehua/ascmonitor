@@ -262,9 +262,9 @@ function DigestRow() {
   )
 }
 
-export function AlertsSection() {
-  return (
-    <SubPage title="通知与告警" backTo="/settings" backLabel="返回设置">
+export function AlertsSection({ embedded = false }: { embedded?: boolean } = {}) {
+  const inner = (
+    <>
       <Section title="推送通知">
         <PushRows />
       </Section>
@@ -277,6 +277,7 @@ export function AlertsSection() {
       <Section title="日报">
         <DigestRow />
       </Section>
-    </SubPage>
+    </>
   )
+  return embedded ? inner : <SubPage title="通知与告警" backTo="/settings" backLabel="返回设置">{inner}</SubPage>
 }

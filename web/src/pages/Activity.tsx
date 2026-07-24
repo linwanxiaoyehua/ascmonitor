@@ -9,8 +9,7 @@ import { dayKey, dayLabel } from '../lib/format'
 import { fmtUsd } from '../lib/money'
 import { ActivityRow } from '../components/ActivityRow'
 import { Icon, type IconName } from '../components/Icon'
-import { SubPage } from '../components/SubPage'
-import { EmptyState, FilterChips, LoadMore, Skeleton } from '../components/ui'
+import { EmptyState, FilterChips, LoadMore, PageHeader, Skeleton } from '../components/ui'
 
 /** 今日汇总条（对齐 实时动态.dc.html）：今日收入 / 新订 / 续费 / 退款 */
 function TodaySummary() {
@@ -95,7 +94,8 @@ export function ActivityPage() {
   }
 
   return (
-    <SubPage title="实时动态" backTo="/" backLabel="返回总览" width="narrow-lg">
+    <div className="narrow-lg">
+      <PageHeader title="实时动态" />
       <TodaySummary />
       <div className="hstack-center">
         <FilterChips scroll multiple label="事件类型" items={KIND_FILTERS} active={kinds} onToggle={toggleKind} />
@@ -145,6 +145,6 @@ export function ActivityPage() {
         })
       )}
       <LoadMore hasNextPage={!!q.hasNextPage} isFetchingNextPage={q.isFetchingNextPage} fetchNextPage={() => q.fetchNextPage()} />
-    </SubPage>
+    </div>
   )
 }

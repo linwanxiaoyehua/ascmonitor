@@ -87,11 +87,20 @@ export function OverviewPage() {
   // 活跃订阅单一口径：全部 Apps 且 ASC 快照 ≥ 昨日用快照，否则实时值
   const snapshotFresh = appId == null && o?.snapshot != null && o.snapshot.date >= yesterdayStr()
   const activeValue = snapshotFresh ? o!.snapshot!.active : o?.activeSubs ?? 0
-  const trialValue = snapshotFresh ? o!.snapshot!.trials : o?.trialSubs ?? 0
   const subsSource = snapshotFresh ? `ASC · ${o!.snapshot!.date.slice(5)}` : '实时'
 
   const todayCaliber = effectiveCaliber(caliber, false)
   const todayRevenue = o ? applyCaliber(o.todayRevenueUsdMilli, todayCaliber, rate) : 0
+
+  // 本月收入（月至今）：从 30 天 metrics 过滤当月即可——月最长 31 天，30 天窗口从每月 31 号
+  // 往回正好覆盖到 1 号（metrics_daily.date 为 UTC，故月首也按 UTC 取）。口径与今日/趋势一致。
+  const monthStart = new Date().toISOString().slice(0, 7) + '-01'
+  const monthMetrics = (metricsQ.data ?? []).filter((d) => d.date >= monthStart)
+  const monthSum = (f: (d: MetricsDaily) => number) => monthMetrics.reduce((s, d) => s + f(d), 0)
+  const billedMonth = (salesQ.data ?? []).filter((d) => d.date >= monthStart).reduce((s, d) => s + d.proceedsUsdMilli, 0)
+  const monthCaliber = effectiveCaliber(caliber, billedMonth > 0)
+  const monthRevenue = monthCaliber === 'billed' ? billedMonth : applyCaliber(monthSum((d) => d.revenue_milli), monthCaliber, rate)
+
   const yesterdayRevenue = metricsQ.data?.filter((d) => d.date === yesterdayStr()).reduce((s, d) => s + d.revenue_milli, 0)
   const todayDelta =
     o && yesterdayRevenue != null && yesterdayRevenue > 0
@@ -140,6 +149,14 @@ export function OverviewPage() {
           onPress={() => navigate('/revenue')}
         />
         <StatCard
+          loading={metricsQ.isPending}
+          icon="chart"
+          label="本月收入"
+          value={fmtUsd(monthRevenue)}
+          foot={`新订 ${monthSum((d) => d.new_subs)} · 续费 ${monthSum((d) => d.renewals)}`}
+          onPress={() => navigate('/revenue')}
+        />
+        <StatCard
           loading={overviewQ.isPending}
           icon="trendingUp"
           label="MRR"
@@ -155,15 +172,6 @@ export function OverviewPage() {
           value={String(activeValue)}
           foot={o && o.riskSubs > 0 ? `流失风险 ${o.riskSubs} · 已关续费 ${o.autoRenewOffCount}` : o ? `已关续费 ${o.autoRenewOffCount}` : undefined}
           onPress={() => navigate('/revenue/detail')}
-        />
-        <StatCard
-          loading={overviewQ.isPending}
-          icon="clock"
-          label="试用中"
-          badge={<CaliberTag>{subsSource}</CaliberTag>}
-          value={String(trialValue)}
-          foot={o?.todayReviewAvg != null ? `今日评分 ${o.todayReviewAvg.toFixed(1)} ★` : undefined}
-          onPress={() => navigate('/revenue/health')}
         />
       </div>
 

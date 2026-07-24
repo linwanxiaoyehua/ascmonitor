@@ -160,6 +160,15 @@ export function RevenueSummary() {
   const todayCaliber = effectiveCaliber(caliber, false)
   const todayRevenue = o ? applyCaliber(o.todayRevenueUsdMilli, todayCaliber, rate) : 0
 
+  // 本月收入（月至今）：从已有 30 天数据过滤当月即可——月最长 31 天，30 天窗口从每月 31 号
+  // 往回正好覆盖到 1 号（metrics_daily.date 为 UTC，故月首也按 UTC 取）。口径与 30 天卡一致。
+  const monthStart = new Date().toISOString().slice(0, 7) + '-01'
+  const monthMetrics = m.filter((d) => d.date >= monthStart)
+  const monthSum = (f: (d: MetricsDaily) => number) => monthMetrics.reduce((s, d) => s + f(d), 0)
+  const billedMonth = (salesQ.data ?? []).filter((d) => d.date >= monthStart).reduce((s, d) => s + d.proceedsUsdMilli, 0)
+  const monthCaliber = effectiveCaliber(caliber, billedMonth > 0)
+  const revenueMonth = monthCaliber === 'billed' ? billedMonth : applyCaliber(monthSum((d) => d.revenue_milli), monthCaliber, rate)
+
   // 订阅活动（按日合并，多 App）
   const byDate = new Map<string, { new_subs: number; renewals: number; refunds: number }>()
   for (const d of m) {
@@ -183,6 +192,13 @@ export function RevenueSummary() {
           label="今日收入"
           value={o ? fmtUsd(todayRevenue) : ''}
           foot={o ? `新订 ${o.todayNewSubs} · 续费 ${o.todayRenewals}` : undefined}
+        />
+        <StatCard
+          loading={metricsQ.isPending}
+          icon="chart"
+          label="本月收入"
+          value={fmtUsd(revenueMonth)}
+          foot={`新订 ${monthSum((d) => d.new_subs)} · 续费 ${monthSum((d) => d.renewals)}`}
         />
         <StatCard
           loading={metricsQ.isPending}

@@ -1,7 +1,7 @@
 // ASSN 事件 → 订阅状态映射（P2 全事件解读）
 
 import { describe, expect, it } from 'vitest'
-import { isTrialTx, resolveStatus } from '../src/lib/events'
+import { buildSubStatement, buildTxStatement, isTrialTx, resolveStatus, txEnvironment } from '../src/lib/events'
 import type { TransactionInfo, RenewalInfo } from '../src/lib/assn'
 
 const NOW = Date.parse('2026-07-17T00:00:00Z')
@@ -39,6 +39,47 @@ describe('isTrialTx', () => {
   })
   it('无优惠不是试用', () => {
     expect(isTrialTx(tx())).toBe(false)
+  })
+})
+
+/** 只记录 SQL 与绑定值的假 D1 —— 这两个 build*Statement 是纯语句构造，不需要真库 */
+function fakeDb() {
+  const calls: Array<{ sql: string; binds: unknown[] }> = []
+  const db = {
+    prepare: (sql: string) => ({
+      bind: (...binds: unknown[]) => {
+        calls.push({ sql, binds })
+        return {} as D1PreparedStatement
+      },
+    }),
+  } as unknown as D1Database
+  return { db, calls }
+}
+
+describe('沙盒环境落库', () => {
+  it('只有 Sandbox 判为沙盒，环境缺失按生产处理', () => {
+    expect(txEnvironment(tx({ environment: 'Sandbox' }))).toBe('Sandbox')
+    expect(txEnvironment(tx({ environment: 'Production' }))).toBe('Production')
+    expect(txEnvironment(tx({ environment: undefined as unknown as string }))).toBe('Production')
+  })
+
+  it('交易 INSERT 的列数与占位符数一致，且带上环境', () => {
+    const { db, calls } = fakeDb()
+    buildTxStatement(db, tx({ environment: 'Sandbox' }), 'SUBSCRIBED', 'INITIAL_BUY', 1, 'uuid-1')
+    const { sql, binds } = calls[0]
+    const columns = sql.match(/INSERT INTO transactions \(([\s\S]*?)\)\s*VALUES/)![1].split(',').length
+    const placeholders = sql.match(/VALUES \(([^)]*)\)/)![1].split(',').length
+    expect(columns).toBe(placeholders)
+    expect(binds).toHaveLength(columns)
+    expect(binds[binds.length - 1]).toBe('Sandbox')
+  })
+
+  it('订阅 INSERT 带上环境（编号参数 ?20）', () => {
+    const { db, calls } = fakeDb()
+    buildSubStatement(db, tx({ environment: 'Sandbox' }), renewal, 'SUBSCRIBED', 'INITIAL_BUY', 1, NOW)
+    const { sql, binds } = calls[0]
+    expect(sql).toContain('environment')
+    expect(binds[19]).toBe('Sandbox')
   })
 })
 

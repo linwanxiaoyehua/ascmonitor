@@ -51,7 +51,8 @@ export function ActivityPage() {
   const appId = useAppFilter()
   // 空数组＝全部；多选并集（后端 kinds 逗号分隔已支持）
   const [kinds, setKinds] = useState<string[]>([])
-  const [hideSandbox, setHideSandbox] = useState(false)
+  // 默认隐藏沙盒：当日合计是收入数字，与收入页「只算生产」的口径保持一致；想看测试内购再点开
+  const [hideSandbox, setHideSandbox] = useState(true)
   const toggleKind = (key: string) =>
     setKinds((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))
 

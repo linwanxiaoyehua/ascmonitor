@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
-import { getOverview, fxRates, toUsd } from '../lib/metrics'
+import { getOverview, fxRates, prodOnly, toUsd } from '../lib/metrics'
 import { fetchReviewsJob } from '../jobs/fetch-reviews'
 import { snapshotRatingsJob } from '../jobs/snapshot-ratings'
 import { fetchSalesJob } from '../jobs/fetch-sales'
@@ -377,7 +377,8 @@ api.get('/subscriptions', async (c) => {
   const status = c.req.query('status')
   const appId = c.req.query('app_id')
   const statuses = status ? status.split(',').map((s) => s.trim()).filter(Boolean) : []
-  const conditions: string[] = []
+  // 沙盒订阅不进列表：与收入 / MRR / 活跃数口径一致，否则数字与列表对不上
+  const conditions: string[] = [prodOnly('s')]
   const binds: unknown[] = []
   if (statuses.length) { conditions.push(`s.status IN (${statuses.map(() => '?').join(',')})`); binds.push(...statuses) }
   if (appId) { conditions.push('s.app_id = ?'); binds.push(Number(appId)) }
@@ -406,7 +407,8 @@ api.get('/purchases', async (c) => {
      FROM transactions t
      LEFT JOIN apps a ON a.id = t.app_id
      LEFT JOIN products p ON p.product_id = t.product_id
-     WHERE t.type != 'Auto-Renewable Subscription' AND t.purchase_date < ? ${appId ? 'AND t.app_id = ?' : ''}
+     WHERE t.type != 'Auto-Renewable Subscription' AND ${prodOnly('t')} AND t.purchase_date < ?
+       ${appId ? 'AND t.app_id = ?' : ''}
      ORDER BY t.purchase_date DESC LIMIT ?`
   )
     .bind(...(appId ? [before, Number(appId), limit] : [before, limit]))
@@ -843,7 +845,8 @@ api.get('/health/data', async (c) => {
     c.env.DB.prepare('SELECT MAX(received_at) AS t FROM notifications_raw').first<{ t: number | null }>(),
     c.env.DB.prepare("SELECT value FROM config WHERE key = 'fx_updated_at'").first<{ value: string }>(),
     c.env.DB.prepare("SELECT value FROM config WHERE key = 'fx_rates_auto'").first<{ value: string }>(),
-    c.env.DB.prepare('SELECT currency, COUNT(*) AS n FROM transactions WHERE currency IS NOT NULL GROUP BY currency').all<{ currency: string; n: number }>(),
+    c.env.DB.prepare(`SELECT currency, COUNT(*) AS n FROM transactions
+       WHERE currency IS NOT NULL AND ${prodOnly()} GROUP BY currency`).all<{ currency: string; n: number }>(),
     c.env.DB.prepare('SELECT COUNT(*) AS n FROM reviews WHERE dup_of IS NOT NULL').first<{ n: number }>(),
     c.env.DB.prepare("SELECT COUNT(*) AS n, SUM(LENGTH(signed_payload)) AS bytes FROM notifications_raw").first<{ n: number; bytes: number | null }>(),
     c.env.DB.prepare("SELECT value FROM config WHERE key = 'reprocess_cursor'").first<{ value: string }>(),

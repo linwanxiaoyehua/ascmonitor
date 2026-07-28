@@ -46,10 +46,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   offer_discount_type TEXT,     -- FREE_TRIAL / PAY_AS_YOU_GO / PAY_UP_FRONT
   is_trial INTEGER NOT NULL DEFAULT 0, -- 免费试用期交易
   refunded INTEGER NOT NULL DEFAULT 0,
-  raw_uuid TEXT                 -- 关联 notifications_raw.uuid
+  raw_uuid TEXT,                -- 关联 notifications_raw.uuid
+  environment TEXT NOT NULL DEFAULT 'Production' -- Production | Sandbox；沙盒不计入任何收入口径
 );
 CREATE INDEX IF NOT EXISTS idx_tx_original ON transactions(original_transaction_id);
 CREATE INDEX IF NOT EXISTS idx_tx_purchase ON transactions(purchase_date);
+CREATE INDEX IF NOT EXISTS idx_tx_env ON transactions(environment, purchase_date);
 
 -- 订阅当前状态（物化）
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -69,7 +71,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   price_increase_status TEXT,   -- PENDING / ACCEPTED（涨价同意状态）
   trial_started_at INTEGER,     -- 试用开始（Trial 漏斗）
   converted_at INTEGER,         -- 试用转正时间（Trial 漏斗）
-  expiration_intent TEXT        -- 过期原因 subtype（VOLUNTARY / BILLING_ERROR…）
+  expiration_intent TEXT,       -- 过期原因 subtype（VOLUNTARY / BILLING_ERROR…）
+  environment TEXT NOT NULL DEFAULT 'Production' -- Production | Sandbox；沙盒不计入活跃 / MRR / 漏斗
 );
 CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);
 

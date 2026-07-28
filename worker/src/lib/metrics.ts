@@ -84,6 +84,17 @@ export function utcDateString(ts: number): string {
 const REVENUE_COND = `(event_type IN ('SUBSCRIBED', 'DID_RENEW', 'ONE_TIME_CHARGE', 'OFFER_REDEEMED')
   OR (event_type = 'DID_CHANGE_RENEWAL_PREF' AND event_subtype = 'UPGRADE'))`
 
+/**
+ * 沙盒过滤：TestFlight / 开发期的测试内购走 Sandbox 环境，金额与真实收入无关，
+ * 一旦混入就会虚增收入、MRR、活跃订阅与转化率。收入相关的每条查询都必须带上。
+ * transactions / subscriptions 的 environment 列是 NOT NULL DEFAULT 'Production'，直接比较即可。
+ */
+export const prodOnly = (alias?: string) => `${alias ? `${alias}.` : ''}environment != 'Sandbox'`
+
+/** notifications_raw 侧的等价条件：原始通知没有列，只能读 JSON（缺字段视作生产） */
+export const PROD_ONLY_RAW = (alias?: string) =>
+  `COALESCE(json_extract(${alias ? `${alias}.` : ''}decoded_json, '$.data.environment'), 'Production') != 'Sandbox'`
+
 export interface Overview {
   todayRevenueUsdMilli: number
   mrrUsdMilli: number
@@ -111,7 +122,7 @@ export async function getOverview(db: D1Database, appId?: number): Promise<Overv
   const todayTx = await bindApp(
     db.prepare(
       `SELECT price_milli, currency, refunded, event_type FROM transactions
-       WHERE purchase_date >= ? AND ${REVENUE_COND} ${appFilter}`
+       WHERE purchase_date >= ? AND ${prodOnly()} AND ${REVENUE_COND} ${appFilter}`
     ),
     dayStart
   ).all<{ price_milli: number | null; currency: string | null; refunded: number; event_type: string }>()
@@ -126,7 +137,7 @@ export async function getOverview(db: D1Database, appId?: number): Promise<Overv
   }
 
   const todayRefunds = await bindApp(
-    db.prepare(`SELECT COUNT(*) AS n FROM transactions WHERE event_type = 'REFUND' AND raw_uuid IN
+    db.prepare(`SELECT COUNT(*) AS n FROM transactions WHERE event_type = 'REFUND' AND ${prodOnly()} AND raw_uuid IN
       (SELECT uuid FROM notifications_raw WHERE received_at >= ?) ${appFilter}`),
     dayStart
   ).first<{ n: number }>()
@@ -135,7 +146,7 @@ export async function getOverview(db: D1Database, appId?: number): Promise<Overv
   const activeRows = await bindApp(
     db.prepare(
       `SELECT status, period, price_milli, currency, auto_renew FROM subscriptions
-       WHERE status IN ('trial', 'active', 'grace_period', 'billing_retry') ${appFilter}`
+       WHERE status IN ('trial', 'active', 'grace_period', 'billing_retry') AND ${prodOnly()} ${appFilter}`
     )
   ).all<{ status: string; period: string | null; price_milli: number | null; currency: string | null; auto_renew: number }>()
 
@@ -191,7 +202,7 @@ export async function rollupDaily(db: D1Database, date: string): Promise<void> {
     const tx = await db
       .prepare(
         `SELECT price_milli, currency, refunded, event_type, event_subtype, is_trial FROM transactions
-         WHERE app_id = ? AND purchase_date >= ? AND purchase_date < ?`
+         WHERE app_id = ? AND purchase_date >= ? AND purchase_date < ? AND ${prodOnly()}`
       )
       .bind(app.id, dayStart, dayEnd)
       .all<{ price_milli: number | null; currency: string | null; refunded: number; event_type: string; event_subtype: string | null; is_trial: number }>()
@@ -218,7 +229,7 @@ export async function rollupDaily(db: D1Database, date: string): Promise<void> {
 
     // 2. 试用转正（converted_at 落在当日）
     const conversions = await db
-      .prepare('SELECT COUNT(*) AS n FROM subscriptions WHERE app_id = ? AND converted_at >= ? AND converted_at < ?')
+      .prepare(`SELECT COUNT(*) AS n FROM subscriptions WHERE app_id = ? AND converted_at >= ? AND converted_at < ? AND ${prodOnly()}`)
       .bind(app.id, dayStart, dayEnd)
       .first<{ n: number }>()
 
@@ -226,7 +237,7 @@ export async function rollupDaily(db: D1Database, date: string): Promise<void> {
     const subs = await db
       .prepare(
         `SELECT period, price_milli, currency, trial_started_at, converted_at FROM subscriptions
-         WHERE app_id = ? AND status != 'revoked'
+         WHERE app_id = ? AND status != 'revoked' AND ${prodOnly()}
            AND started_at IS NOT NULL AND started_at < ?
            AND (expires_at IS NULL OR expires_at > ?)`
       )

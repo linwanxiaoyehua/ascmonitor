@@ -20,6 +20,11 @@ export function isTrialTx(tx: TransactionInfo | null): boolean {
   return !!tx && tx.offerType === 1 && (tx.price ?? 0) === 0
 }
 
+/** 交易环境：只认 Sandbox 一个特例，其余（含缺失）一律当生产，宁可多算也不错过真实收入 */
+export function txEnvironment(tx: TransactionInfo): string {
+  return tx.environment === 'Sandbox' ? 'Sandbox' : 'Production'
+}
+
 /** 事件映射表：notificationType(+subtype) → 订阅状态；null = 不改状态 */
 export function resolveStatus(
   type: string,
@@ -95,10 +100,11 @@ export function buildTxStatement(
     .prepare(
       `INSERT INTO transactions (transaction_id, original_transaction_id, app_id, product_id, type,
          price_milli, currency, country, purchase_date, expires_date,
-         event_type, event_subtype, offer_type, offer_discount_type, is_trial, refunded, raw_uuid)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         event_type, event_subtype, offer_type, offer_discount_type, is_trial, refunded, raw_uuid, environment)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(transaction_id) DO UPDATE SET
          refunded = excluded.refunded,
+         environment = excluded.environment,
          -- 退款/撤销是状态修正，不覆盖"创建"该交易的事件类型（否则退款撤销后不再匹配收入口径）
          event_type = CASE
            WHEN excluded.event_type IN ('REFUND', 'REFUND_REVERSED', 'REFUND_DECLINED') THEN transactions.event_type
@@ -127,7 +133,8 @@ export function buildTxStatement(
       tx.offerDiscountType ?? null,
       isTrialTx(tx) ? 1 : 0,
       refunded,
-      rawUuid
+      rawUuid,
+      txEnvironment(tx)
     )
 }
 
@@ -159,11 +166,13 @@ export function buildSubStatement(
     .prepare(
       `INSERT INTO subscriptions (original_transaction_id, app_id, product_id, status, auto_renew,
          period, price_milli, currency, country, started_at, expires_at, updated_at,
-         pending_product_id, price_increase_status, trial_started_at, converted_at, expiration_intent)
+         pending_product_id, price_increase_status, trial_started_at, converted_at, expiration_intent,
+         environment)
        VALUES (?1, ?2, ?3, COALESCE(?4, 'active'), COALESCE(?5, 1), ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-         ?13, ?14, CASE WHEN ?15 THEN ?16 ELSE NULL END, NULL, ?17)
+         ?13, ?14, CASE WHEN ?15 THEN ?16 ELSE NULL END, NULL, ?17, ?20)
        ON CONFLICT(original_transaction_id) DO UPDATE SET
          product_id = excluded.product_id,
+         environment = excluded.environment,
          status = COALESCE(?4, subscriptions.status),
          auto_renew = COALESCE(?5, subscriptions.auto_renew),
          period = COALESCE(excluded.period, subscriptions.period),
@@ -206,7 +215,8 @@ export function buildSubStatement(
       purchaseDate, // 16
       expIntent, // 17
       isDowngrade, // 18
-      clearPending // 19
+      clearPending, // 19
+      txEnvironment(tx) // 20
     )
 }
 

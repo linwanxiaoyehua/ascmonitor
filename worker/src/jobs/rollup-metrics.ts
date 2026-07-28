@@ -25,7 +25,9 @@ export async function rollupMetricsJob(
   budget.spend(1)
   const cursor = cursorRow?.value ?? ''
 
-  // 只取「有交易且晚于游标」的自然日（UTC），避免空跑
+  // 只取「有交易且晚于游标」的自然日（UTC），避免空跑。
+  // 这里刻意不排除沙盒：只有沙盒交易的那天同样要进列表，
+  // 才能被 rollupDaily（内部已过滤沙盒）重算成 0 —— 否则旧的含沙盒值会永远残留。
   const dateRows = await db
     .prepare(
       `SELECT DISTINCT date(purchase_date / 1000, 'unixepoch') AS d FROM transactions

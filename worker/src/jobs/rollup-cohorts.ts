@@ -2,7 +2,7 @@
 // cohort = 订阅 started_at 所在 UTC 月；revenue_milli_cum = 该批订阅至今的累计收入（USD 毫）
 // D1 成本：2 读 + 1 batch 写 ≈ 3 子请求
 
-import { fxRates } from '../lib/metrics'
+import { fxRates, prodOnly } from '../lib/metrics'
 import { Budget } from '../lib/budget'
 
 const REVENUE_EVENTS = new Set(['SUBSCRIBED', 'DID_RENEW', 'OFFER_REDEEMED'])
@@ -12,12 +12,13 @@ export async function rollupCohortsJob(db: D1Database, budget = new Budget(40)):
   budget.spend(1)
 
   const subs = await db
-    .prepare('SELECT original_transaction_id, app_id, started_at FROM subscriptions WHERE started_at IS NOT NULL')
+    .prepare(`SELECT original_transaction_id, app_id, started_at FROM subscriptions
+       WHERE started_at IS NOT NULL AND ${prodOnly()}`)
     .all<{ original_transaction_id: string; app_id: number | null; started_at: number }>()
   const txs = await db
     .prepare(
       `SELECT original_transaction_id, price_milli, currency, event_type, event_subtype FROM transactions
-       WHERE refunded = 0 AND type = 'Auto-Renewable Subscription'`
+       WHERE refunded = 0 AND type = 'Auto-Renewable Subscription' AND ${prodOnly()}`
     )
     .all<{ original_transaction_id: string; price_milli: number | null; currency: string | null; event_type: string; event_subtype: string | null }>()
   budget.spend(2)

@@ -1,7 +1,7 @@
 // P3 收入深化指标：全部即时计算（设计原则：能即时算的不物化）
 // 依赖 P2 落库字段：is_trial / trial_started_at / converted_at / expiration_intent / event_subtype
 
-import { fxRates } from './metrics'
+import { fxRates, PROD_ONLY_RAW, prodOnly } from './metrics'
 
 /** 产生收入的交易条件（与 metrics.ts REVENUE_COND 同口径） */
 const REVENUE_COND = `(event_type IN ('SUBSCRIBED', 'DID_RENEW', 'ONE_TIME_CHARGE', 'OFFER_REDEEMED')
@@ -36,9 +36,10 @@ export async function subHealth(db: D1Database, days = 30, appId?: number): Prom
   const renewalRows = await bind(
     db.prepare(
       `SELECT (SELECT COUNT(*) FROM transactions t2
-          WHERE t2.original_transaction_id = t.original_transaction_id AND t2.purchase_date < t.purchase_date) AS seq
+          WHERE t2.original_transaction_id = t.original_transaction_id AND t2.purchase_date < t.purchase_date
+            AND ${prodOnly('t2')}) AS seq
        FROM transactions t
-       WHERE t.event_type = 'DID_RENEW' AND t.purchase_date >= ? ${appFilter}`
+       WHERE t.event_type = 'DID_RENEW' AND t.purchase_date >= ? AND ${prodOnly('t')} ${appFilter}`
     ),
     since
   ).all<{ seq: number }>()
@@ -46,7 +47,8 @@ export async function subHealth(db: D1Database, days = 30, appId?: number): Prom
   const firstRenewals = renewalRows.results.filter((r) => r.seq <= 1).length
 
   const expired = await bind(
-    db.prepare(`SELECT COUNT(*) AS n FROM notifications_raw WHERE type = 'EXPIRED' AND received_at >= ? ${appFilter}`),
+    db.prepare(`SELECT COUNT(*) AS n FROM notifications_raw
+       WHERE type = 'EXPIRED' AND received_at >= ? AND ${PROD_ONLY_RAW()} ${appFilter}`),
     since
   ).first<{ n: number }>()
   const expirations = expired?.n ?? 0
@@ -57,7 +59,7 @@ export async function subHealth(db: D1Database, days = 30, appId?: number): Prom
       `SELECT SUM(CASE WHEN expiration_intent = 'VOLUNTARY' THEN 1 ELSE 0 END) AS voluntary,
               COUNT(*) AS total
        FROM subscriptions
-       WHERE status IN ('expired', 'revoked') AND updated_at >= ? ${appFilter}`
+       WHERE status IN ('expired', 'revoked') AND updated_at >= ? AND ${prodOnly()} ${appFilter}`
     ),
     since
   ).first<{ voluntary: number | null; total: number }>()
@@ -68,7 +70,7 @@ export async function subHealth(db: D1Database, days = 30, appId?: number): Prom
   const atStart = await bind(
     db.prepare(
       `SELECT COUNT(*) AS n FROM subscriptions
-       WHERE status != 'revoked' AND started_at IS NOT NULL AND started_at < ?
+       WHERE status != 'revoked' AND ${prodOnly()} AND started_at IS NOT NULL AND started_at < ?
          AND (expires_at IS NULL OR expires_at > ?) ${appFilter}`
     ),
     since,
@@ -78,11 +80,13 @@ export async function subHealth(db: D1Database, days = 30, appId?: number): Prom
   const activeAtStart = (atStart?.n ?? 0) + churnedTotal
 
   const refundsRow = await bind(
-    db.prepare(`SELECT COUNT(*) AS n FROM notifications_raw WHERE type = 'REFUND' AND received_at >= ? ${appFilter}`),
+    db.prepare(`SELECT COUNT(*) AS n FROM notifications_raw
+       WHERE type = 'REFUND' AND received_at >= ? AND ${PROD_ONLY_RAW()} ${appFilter}`),
     since
   ).first<{ n: number }>()
   const purchasesRow = await bind(
-    db.prepare(`SELECT COUNT(*) AS n FROM transactions WHERE purchase_date >= ? AND ${REVENUE_COND} ${appFilter}`),
+    db.prepare(`SELECT COUNT(*) AS n FROM transactions
+       WHERE purchase_date >= ? AND ${prodOnly()} AND ${REVENUE_COND} ${appFilter}`),
     since
   ).first<{ n: number }>()
   const refunds = refundsRow?.n ?? 0
@@ -116,9 +120,11 @@ export interface TrialCohort {
 /** Trial 转化漏斗：按开始试用的周 cohort */
 export async function trialCohorts(db: D1Database, weeks = 12, appId?: number): Promise<TrialCohort[]> {
   const since = Date.now() - weeks * 7 * 86400_000
+  const base = `SELECT trial_started_at, converted_at FROM subscriptions
+     WHERE trial_started_at >= ? AND ${prodOnly()}`
   const rows = await (appId
-    ? db.prepare('SELECT trial_started_at, converted_at FROM subscriptions WHERE trial_started_at >= ? AND app_id = ?').bind(since, appId)
-    : db.prepare('SELECT trial_started_at, converted_at FROM subscriptions WHERE trial_started_at >= ?').bind(since)
+    ? db.prepare(`${base} AND app_id = ?`).bind(since, appId)
+    : db.prepare(base).bind(since)
   ).all<{ trial_started_at: number; converted_at: number | null }>()
 
   const byWeek = new Map<string, { starts: number; converted: number }>()
@@ -161,11 +167,11 @@ export async function revenueBreakdown(
   const rows = await (appId
     ? db.prepare(
         `SELECT ${col} AS k, ${nameCol} AS label, t.price_milli, t.currency FROM transactions t ${join}
-         WHERE t.purchase_date >= ? AND t.refunded = 0 AND ${REVENUE_COND} ${appFilter}`
+         WHERE t.purchase_date >= ? AND t.refunded = 0 AND ${prodOnly('t')} AND ${REVENUE_COND} ${appFilter}`
       ).bind(since, appId)
     : db.prepare(
         `SELECT ${col} AS k, ${nameCol} AS label, t.price_milli, t.currency FROM transactions t ${join}
-         WHERE t.purchase_date >= ? AND t.refunded = 0 AND ${REVENUE_COND}`
+         WHERE t.purchase_date >= ? AND t.refunded = 0 AND ${prodOnly('t')} AND ${REVENUE_COND}`
       ).bind(since)
   ).all<{ k: string | null; label: string | null; price_milli: number | null; currency: string | null }>()
 

@@ -107,7 +107,7 @@ export function StatCard({
 /* ---------- ListRow ---------- */
 
 export function ListRow({
-  leading, title, badges, detail, amount, time, trailing, trailingIsControl, chevronOpen, onPress,
+  leading, title, badges, detail, amount, time, trailing, trailingIsControl, chevronOpen, onPress, className,
 }: {
   leading?: ReactNode
   title: ReactNode
@@ -120,7 +120,10 @@ export function ListRow({
   trailingIsControl?: boolean
   chevronOpen?: boolean
   onPress?: () => void
+  /** 附加类名（如次级行的缩进变体），叠在 .lrow 之上 */
+  className?: string
 }) {
+  const cls = (base: string) => (className ? `${base} ${className}` : base)
   const amountText = amount ? fmtMoney(amount.milli, amount.currency) : ''
   const body = (
     <>
@@ -154,7 +157,7 @@ export function ListRow({
   // 且点开关会连带触发整行的 onPress。改用覆盖层：透明按钮铺满行底，控件浮在其上。
   if (onPress && trailingIsControl) {
     return (
-      <div className="lrow has-control">
+      <div className={cls('lrow has-control')}>
         <button
           className="lrow-hit"
           onClick={onPress}
@@ -167,9 +170,9 @@ export function ListRow({
   }
 
   return onPress ? (
-    <button className="lrow pressable" onClick={onPress} aria-expanded={chevronOpen}>{body}</button>
+    <button className={cls('lrow pressable')} onClick={onPress} aria-expanded={chevronOpen}>{body}</button>
   ) : (
-    <div className="lrow">{body}</div>
+    <div className={cls('lrow')}>{body}</div>
   )
 }
 

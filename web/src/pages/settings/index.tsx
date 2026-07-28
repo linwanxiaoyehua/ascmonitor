@@ -147,7 +147,7 @@ function SettingsHome() {
 }
 
 export function SettingsPage() {
-  const params = useParams<{ section?: string }>()
+  const params = useParams<{ section?: string; sub?: string }>()
   switch (params.section) {
     case 'connect':
       return <ConnectSection />
@@ -156,7 +156,8 @@ export function SettingsPage() {
     case 'alerts':
       return <AlertsSection />
     case 'builds':
-      return <BuildsSection />
+      // /settings/builds/:appId —— 单个 App 的全部构建 / 审核状态
+      return <BuildsSection appId={params.sub ? Number(params.sub) : undefined} />
     case 'data':
       return <DataSection />
     default:

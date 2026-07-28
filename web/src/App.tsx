@@ -182,7 +182,8 @@ export function App() {
             <Route path="/revenue/:sub?" component={RevenuePage} />
             <Route path="/reviews" component={ReviewsPage} />
             <Route path="/activity" component={ActivityPage} />
-            <Route path="/settings/:section?" component={SettingsPage} />
+            {/* :sub 目前只有构建监控用到（/settings/builds/:appId） */}
+            <Route path="/settings/:section?/:sub?" component={SettingsPage} />
             <Route component={OverviewPage} />
           </Switch>
         </Suspense>

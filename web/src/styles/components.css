@@ -439,6 +439,16 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.985);
 .icon-stack .icon-badge.tone-warning { background: var(--warning-icon); }
 .icon-stack .icon-badge.tone-accent { background: var(--accent); }
 
+/* ---- 构建监控分组 ---- */
+/* 设置页每个 App 一张卡：App 行 + 最新构建 + 最新上架审核；完整列表在二级页 */
+.build-groups { display: flex; flex-direction: column; gap: var(--s3); }
+/* 次级行左缩进，让小图标与 App 图标形成层级；文本起点与 App 名基本对齐 */
+.lrow.lrow-sub { padding-left: var(--s8); min-height: 44px; }
+.lrow.lrow-sub .title { font-size: var(--fs-4); }
+
+/* 二级页页头：App 图标 + 名称（桌面隐藏了 SubPage 的返回标题栏，靠它指明当前 App） */
+.app-head { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
+
 /* ---- Timeline（订阅行展开） ---- */
 .timeline { padding: var(--s0-5) var(--s4) var(--s3) 60px; }
 .timeline-item {

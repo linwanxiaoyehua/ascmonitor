@@ -43,7 +43,10 @@ function HealthSection() {
         if (res.done) break
         setRebuilding(`重算每日指标… 已 ${days} 天`)
       }
-      toast.success(`重建完成，回放 ${total} 条通知，重算 ${days} 天指标`)
+      // LTV cohort 同样按交易口径物化，不跟着重算就得等下周一的 cron
+      setRebuilding('重算 LTV cohort…')
+      await api('/api/jobs/rollup-cohorts', { method: 'POST' })
+      toast.success(`重建完成，回放 ${total} 条通知，重算 ${days} 天指标与 LTV cohort`)
       queryClient.invalidateQueries()
     } catch {
       toast.error('重建中断，可再次点击续跑')
@@ -85,7 +88,7 @@ function HealthSection() {
         <ListRow
           leading={<span className="row-icon tone-accent"><Icon name="refresh" size={16} /></span>}
           title={rebuilding ?? (health.reprocessInProgress ? '继续重建订阅状态' : '重建订阅状态')}
-          detail="回放全部历史通知，补齐升降级 / 试用漏斗 / 退款撤销等新字段"
+          detail="回放全部历史通知补齐新字段，并重算每日指标与 LTV cohort"
           trailing="chevron"
           onPress={rebuild}
         />
@@ -140,7 +143,9 @@ export function DataSection({ embedded = false }: { embedded?: boolean } = {}) {
         if (res.done) break
         setBackfilling(`重算每日指标… 已 ${days} 天`)
       }
-      toast.success(`回填完成：新增 ${inserted} 条历史通知，重建 ${total} 条，重算 ${days} 天指标`)
+      setBackfilling('重算 LTV cohort…')
+      await api('/api/jobs/rollup-cohorts', { method: 'POST' })
+      toast.success(`回填完成：新增 ${inserted} 条历史通知，重建 ${total} 条，重算 ${days} 天指标与 LTV cohort`)
       queryClient.invalidateQueries()
     } catch {
       toast.error('回填中断，可再次点击续跑')

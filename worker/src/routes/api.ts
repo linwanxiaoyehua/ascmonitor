@@ -13,7 +13,7 @@ import { revenueBreakdown, subHealth, trialCohorts } from '../lib/insights'
 import { createWebhook, deleteWebhook, loadAscCredentials, postReviewResponse } from '../lib/asc-api'
 import { describeState, type BuildScope } from '../lib/build-status'
 import { enrichApp, type AppLite } from '../lib/app-enrich'
-import { decodeJwsPayload, type TransactionInfo } from '../lib/assn'
+import { decodeJwsPayload, type RenewalInfo, type TransactionInfo } from '../lib/assn'
 
 export const api = new Hono<{ Bindings: Env }>()
 
@@ -136,6 +136,35 @@ const ACTIVITY_KIND_TYPES: Record<string, string[]> = {
 // 也不该并入当日净收入。收入部分须与 web/src/lib/format.ts 的 REVENUE_TYPES 一致。
 const AMOUNT_EVENT_TYPES = ['SUBSCRIBED', 'DID_RENEW', 'ONE_TIME_CHARGE', 'REFUND']
 
+/**
+ * 订阅换购（升级 / 降级 / 取消降级）的「旧 → 新」。
+ * Apple 的 DID_CHANGE_RENEWAL_PREF 只给「本次交易 + 下期产品」，光看 subtype 只知道升还是降，
+ * 不知道从哪个套餐换到了哪个 —— 这里把两端都补齐，动态流才说得清到底做了什么。
+ */
+interface ProductChange {
+  fromId: string | null
+  fromName: string | null
+  toId: string | null
+  toName: string | null
+  /** 下期续费价（降级不产生交易，金额只能从 renewalInfo 拿） */
+  renewalPriceMilli: number | null
+  renewalCurrency: string | null
+}
+
+/** productId → ASC 正式名（products 目录，fetch-products 每日同步）；空值自动忽略 */
+async function resolveProductNames(
+  db: D1Database,
+  ids: (string | null | undefined)[]
+): Promise<Map<string, string>> {
+  const uniq = [...new Set(ids.filter((v): v is string => !!v))]
+  if (!uniq.length) return new Map()
+  const rows = await db
+    .prepare(`SELECT product_id, name FROM products WHERE product_id IN (${uniq.map(() => '?').join(',')})`)
+    .bind(...uniq)
+    .all<{ product_id: string; name: string }>()
+  return new Map(rows.results.map((p) => [p.product_id, p.name]))
+}
+
 api.get('/activity', async (c) => {
   const before = Number(c.req.query('before') ?? Date.now() + 1)
   const limit = Math.min(Number(c.req.query('limit') ?? 50), 200)
@@ -170,7 +199,8 @@ api.get('/activity', async (c) => {
       c.env.DB.prepare(
         `SELECT n.uuid, n.app_id, n.type, n.subtype, n.decoded_json, n.received_at,
                 a.name AS app_name, a.icon_url AS app_icon, a.bundle_id AS app_bundle_id,
-                t.product_id, t.price_milli, t.currency, t.country, t.is_trial, p.name AS product_name
+                t.product_id, t.price_milli, t.currency, t.country, t.is_trial, p.name AS product_name,
+                t.original_transaction_id, t.purchase_date
          FROM notifications_raw n
          LEFT JOIN apps a ON a.id = n.app_id
          LEFT JOIN transactions t ON t.raw_uuid = n.uuid
@@ -185,13 +215,39 @@ api.get('/activity', async (c) => {
           app_name: string | null; app_icon: string | null; app_bundle_id: string | null
           product_id: string | null; price_milli: number | null; currency: string | null; country: string | null
           is_trial: number | null; product_name: string | null
+          original_transaction_id: string | null; purchase_date: number | null
         }>()
         .then(async (rows) => {
+          // 升级的「换购前产品」要回溯同一订阅的上一笔交易，先记下订阅号与本次购买时间
+          const upgrades: { change: ProductChange; otid: string; at: number }[] = []
           const items = rows.results.map((r) => {
             const decoded = JSON.parse(r.decoded_json)
             // 退款 / 消耗查询等复用既有交易的事件，transactions.raw_uuid 指向原始购买通知，
             // t.raw_uuid = n.uuid join 落空 —— 直接从通知自带的 signedTransactionInfo 解出金额/产品补齐
             const tx = r.price_milli == null ? decodeJwsPayload<TransactionInfo>(decoded.data?.signedTransactionInfo) : null
+            const otid = r.original_transaction_id ?? tx?.originalTransactionId ?? null
+
+            let productChange: ProductChange | null = null
+            if (r.type === 'DID_CHANGE_RENEWAL_PREF') {
+              const renewal = decodeJwsPayload<RenewalInfo>(decoded.data?.signedRenewalInfo)
+              const current = r.product_id ?? tx?.productId ?? null // 本次通知携带的交易所属产品
+              const next = renewal?.autoRenewProductId ?? null // 下期续费的产品
+              // 升级立即换期：本次交易已经是新产品，旧产品只能回溯上一笔交易（下方批量补）；
+              // 降级 / 取消降级不产生交易：当前交易仍是旧产品，新产品看 autoRenewProductId
+              const isUpgrade = r.subtype === 'UPGRADE'
+              productChange = {
+                fromId: isUpgrade ? null : current,
+                fromName: null,
+                toId: isUpgrade ? current ?? next : next ?? current,
+                toName: null,
+                renewalPriceMilli: renewal?.renewalPrice ?? null,
+                renewalCurrency: renewal?.currency ?? null,
+              }
+              if (isUpgrade && otid) {
+                upgrades.push({ change: productChange, otid, at: r.purchase_date ?? r.received_at })
+              }
+            }
+
             return {
               kind: 'event', id: r.uuid, ts: r.received_at,
               type: r.type, subtype: r.subtype,
@@ -204,16 +260,41 @@ api.get('/activity', async (c) => {
               currency: r.currency ?? tx?.currency ?? null,
               country: r.country ?? tx?.storefront ?? null,
               isTrial: r.is_trial === 1, // 免费试用（0 元）也要显示金额并标「试用」
+              // 点开可看该订阅 / 该次购买的完整历史
+              originalTransactionId: otid,
+              productChange,
             }
           })
-          // join 未命中（退款/消耗查询）的行没有 product_name，按 productId 批量补正式名
-          const missing = [...new Set(items.filter((i) => !i.productName && i.productId).map((i) => i.productId!))]
-          if (missing.length) {
-            const prods = await c.env.DB.prepare(
-              `SELECT product_id, name FROM products WHERE product_id IN (${missing.map(() => '?').join(',')})`
-            ).bind(...missing).all<{ product_id: string; name: string }>()
-            const names = new Map(prods.results.map((p) => [p.product_id, p.name]))
-            for (const i of items) if (!i.productName && i.productId) i.productName = names.get(i.productId) ?? null
+
+          // 升级前的产品 = 同一订阅里本次之前、且不同于新产品的最后一笔交易
+          if (upgrades.length) {
+            const otids = [...new Set(upgrades.map((u) => u.otid))]
+            const hist = await c.env.DB.prepare(
+              `SELECT original_transaction_id AS otid, product_id, purchase_date FROM transactions
+               WHERE original_transaction_id IN (${otids.map(() => '?').join(',')})
+               ORDER BY purchase_date`
+            ).bind(...otids).all<{ otid: string; product_id: string; purchase_date: number | null }>()
+            for (const u of upgrades) {
+              const prev = hist.results
+                .filter((h) => h.otid === u.otid && (h.purchase_date ?? 0) <= u.at && h.product_id !== u.change.toId)
+                .pop()
+              u.change.fromId = prev?.product_id ?? null
+            }
+          }
+
+          // join 未命中（退款/消耗查询）的行没有 product_name，按 productId 批量补正式名；
+          // 换购两端的产品同样要正式名，一并查
+          const names = await resolveProductNames(
+            c.env.DB,
+            items.flatMap((i) => [i.productName ? null : i.productId, i.productChange?.fromId, i.productChange?.toId])
+          )
+          for (const i of items) {
+            if (!i.productName && i.productId) i.productName = names.get(i.productId) ?? null
+            const ch = i.productChange
+            if (ch) {
+              ch.fromName = ch.fromId ? names.get(ch.fromId) ?? null : null
+              ch.toName = ch.toId ? names.get(ch.toId) ?? null : null
+            }
           }
           return items
         })
@@ -420,15 +501,102 @@ api.get('/purchases', async (c) => {
   })
 })
 
+/**
+ * 一条订阅（或一次性购买）的完整历史：首次订阅、每次续费、升降级、取消续费、扣款失败、过期、退款…
+ *
+ * 以原始通知为主线而不是交易表 —— 不产生新交易的事件（降级、关闭续费、过期…）在 transactions 里
+ * 只是 upsert 到已有行，只查交易表就看不见它们发生过。交易表在这里只负责补金额与产品。
+ * 老通知的 original_transaction_id 可能还没回填（0008 迁移后需跑一次「重放通知」），
+ * 所以额外用 raw_uuid 反查兜底，回填前至少不比原来少。
+ */
 api.get('/subscriptions/:otid/timeline', async (c) => {
+  const otid = c.req.param('otid')
   const rows = await c.env.DB.prepare(
-    `SELECT t.*, n.type AS notification_type, n.subtype, n.received_at
-     FROM transactions t LEFT JOIN notifications_raw n ON t.raw_uuid = n.uuid
-     WHERE t.original_transaction_id = ? ORDER BY t.purchase_date`
+    `SELECT n.uuid, n.type, n.subtype, n.received_at, n.decoded_json,
+            t.transaction_id, t.product_id, t.price_milli, t.currency, t.country,
+            t.purchase_date, t.expires_date, t.refunded, t.is_trial, t.environment,
+            p.name AS product_name
+     FROM notifications_raw n
+     LEFT JOIN transactions t ON t.raw_uuid = n.uuid
+     LEFT JOIN products p ON p.product_id = t.product_id
+     WHERE n.original_transaction_id = ?1
+        OR n.uuid IN (SELECT raw_uuid FROM transactions WHERE original_transaction_id = ?1)
+     ORDER BY n.received_at`
   )
-    .bind(c.req.param('otid'))
-    .all()
-  return c.json(rows.results)
+    .bind(otid)
+    .all<{
+      uuid: string; type: string; subtype: string | null; received_at: number; decoded_json: string
+      transaction_id: string | null; product_id: string | null; price_milli: number | null
+      currency: string | null; country: string | null; purchase_date: number | null; expires_date: number | null
+      refunded: number | null; is_trial: number | null; environment: string | null; product_name: string | null
+    }>()
+
+  // 同一订阅的交易全集：升级前的产品要从时间上的前一笔交易反推
+  const txs = await c.env.DB.prepare(
+    `SELECT transaction_id, product_id, purchase_date FROM transactions
+     WHERE original_transaction_id = ? ORDER BY purchase_date`
+  )
+    .bind(otid)
+    .all<{ transaction_id: string; product_id: string; purchase_date: number | null }>()
+
+  const items = rows.results.map((r) => {
+    const decoded = JSON.parse(r.decoded_json)
+    // 交易 join 落空（降级等复用既有交易的事件）时，产品/金额从通知自带的 JWS 解出
+    const tx = r.transaction_id ? null : decodeJwsPayload<TransactionInfo>(decoded.data?.signedTransactionInfo)
+    const at = r.purchase_date ?? tx?.purchaseDate ?? r.received_at
+    const productId = r.product_id ?? tx?.productId ?? null
+
+    let productChange: ProductChange | null = null
+    if (r.type === 'DID_CHANGE_RENEWAL_PREF') {
+      const renewal = decodeJwsPayload<RenewalInfo>(decoded.data?.signedRenewalInfo)
+      const next = renewal?.autoRenewProductId ?? null
+      const isUpgrade = r.subtype === 'UPGRADE'
+      const toId = isUpgrade ? productId ?? next : next ?? productId
+      productChange = {
+        // 升级立即换期，本次交易已是新产品；旧产品 = 本次之前最后一笔不同产品的交易
+        fromId: isUpgrade
+          ? txs.results.filter((t) => (t.purchase_date ?? 0) <= at && t.product_id !== toId).pop()?.product_id ?? null
+          : productId,
+        fromName: null,
+        toId,
+        toName: null,
+        renewalPriceMilli: renewal?.renewalPrice ?? null,
+        renewalCurrency: renewal?.currency ?? null,
+      }
+    }
+
+    return {
+      id: r.uuid,
+      ts: at,
+      type: r.type,
+      subtype: r.subtype,
+      transactionId: r.transaction_id ?? tx?.transactionId ?? null,
+      productId,
+      productName: r.product_name,
+      priceMilli: r.price_milli ?? tx?.price ?? null,
+      currency: r.currency ?? tx?.currency ?? null,
+      country: r.country ?? tx?.storefront ?? null,
+      expiresDate: r.expires_date ?? tx?.expiresDate ?? null,
+      refunded: r.refunded === 1,
+      isTrial: r.is_trial === 1,
+      environment: r.environment ?? decoded.data?.environment ?? null,
+      productChange,
+    }
+  })
+
+  const names = await resolveProductNames(
+    c.env.DB,
+    items.flatMap((i) => [i.productName ? null : i.productId, i.productChange?.fromId, i.productChange?.toId])
+  )
+  for (const i of items) {
+    if (!i.productName && i.productId) i.productName = names.get(i.productId) ?? null
+    if (i.productChange) {
+      i.productChange.fromName = i.productChange.fromId ? names.get(i.productChange.fromId) ?? null : null
+      i.productChange.toName = i.productChange.toId ? names.get(i.productChange.toId) ?? null : null
+    }
+  }
+  items.sort((a, b) => a.ts - b.ts)
+  return c.json(items)
 })
 
 // 评论流（M5）

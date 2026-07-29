@@ -449,26 +449,50 @@ button.stat-card:active { background: var(--bg-raised); transform: scale(0.985);
 /* 二级页页头：App 图标 + 名称（桌面隐藏了 SubPage 的返回标题栏，靠它指明当前 App） */
 .app-head { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
 
-/* ---- Timeline（订阅行展开） ---- */
+/* ---- Timeline（订阅历史：动态流点开 / 收入·明细订阅行展开） ----
+   每条两行：主行说「发生了什么 + 多少钱」，次行说「哪个套餐 / 换成了什么 + 何时」 */
 .timeline { padding: var(--s0-5) var(--s4) var(--s3) 60px; }
 .timeline-item {
-  display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s1) 0;
+  display: flex; align-items: flex-start; gap: var(--s2);
+  padding: var(--s1-5) 0;
   font-size: var(--fs-3);
   position: relative;
 }
 .timeline-item + .timeline-item::before {
   content: '';
   position: absolute;
-  left: 2.5px; top: -8px;
-  width: 1px; height: var(--s3);
+  left: 2.5px; top: -10px;
+  width: 1px; height: var(--s4);
   background: var(--border-strong);
 }
-.timeline-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--success-icon); }
-.timeline-dot.neg { background: var(--danger-icon); }
-.timeline-label { color: var(--text-1); }
-.timeline-amount { color: var(--text-2); margin-left: auto; }
-.timeline-time { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.timeline-dot {
+  width: 6px; height: 6px; flex: none; border-radius: 50%;
+  margin-top: 5px;
+  background: var(--neutral);
+}
+.timeline-dot.tone-success { background: var(--success-icon); }
+.timeline-dot.tone-danger { background: var(--danger-icon); }
+.timeline-dot.tone-warning { background: var(--warning-icon); }
+.timeline-dot.tone-info { background: var(--info-icon); }
+.timeline-dot.tone-accent { background: var(--accent); }
+.timeline-body { flex: 1; min-width: 0; }
+.timeline-head { display: flex; align-items: center; gap: var(--s1-5); }
+.timeline-label { color: var(--text-1); font-weight: var(--fw-medium); }
+.timeline-note {
+  font-size: var(--fs-1); font-weight: var(--fw-semi);
+  color: var(--accent-text); background: var(--accent-soft);
+  padding: 1px var(--s1-5); border-radius: var(--radius-pill); white-space: nowrap;
+}
+.timeline-note.neg { color: var(--danger); background: var(--danger-soft); }
+.timeline-amount { color: var(--text-2); margin-left: auto; padding-left: var(--s2); white-space: nowrap; }
+.timeline-amount.neg { color: var(--danger); }
+.timeline-sub {
+  display: flex; align-items: baseline; gap: var(--s2);
+  margin-top: 1px;
+  font-size: var(--fs-2); color: var(--text-2);
+}
+.timeline-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-time { margin-left: auto; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ---- SegmentedControl / SegmentedLinks ---- */
 .segmented {

@@ -105,13 +105,9 @@ export function buildTxStatement(
        ON CONFLICT(transaction_id) DO UPDATE SET
          refunded = excluded.refunded,
          environment = excluded.environment,
-         -- 退款/撤销是状态修正，不覆盖"创建"该交易的事件类型（否则退款撤销后不再匹配收入口径）
-         event_type = CASE
-           WHEN excluded.event_type IN ('REFUND', 'REFUND_REVERSED', 'REFUND_DECLINED') THEN transactions.event_type
-           ELSE excluded.event_type END,
-         event_subtype = CASE
-           WHEN excluded.event_type IN ('REFUND', 'REFUND_REVERSED', 'REFUND_DECLINED') THEN transactions.event_subtype
-           ELSE excluded.event_subtype END,
+         -- 刻意不更新 event_type / event_subtype：它们的语义是「创建本条交易的那个事件」。
+         -- 后续事件（退款、取消续费、降级、扣款失败、过期…）大多也带同一份 signedTransactionInfo，
+         -- 覆盖会把一笔续费的类型改成 DID_CHANGE_RENEWAL_STATUS 之类，那笔钱就从收入口径里消失了
          offer_type = COALESCE(excluded.offer_type, transactions.offer_type),
          offer_discount_type = COALESCE(excluded.offer_discount_type, transactions.offer_discount_type),
          is_trial = MAX(excluded.is_trial, transactions.is_trial)`
@@ -220,26 +216,32 @@ export function buildSubStatement(
     )
 }
 
-/** 推送正文：App 名 · 产品 周期 金额 · 🇨🇳 中国 */
+/** 推送正文：App 名 · 产品 周期 金额 · 🇨🇳 中国；换购时产品段变成「旧 → 新」 */
 function buildBody(
   appName: string | null,
   bundleId: string | undefined,
   tx: TransactionInfo | null,
-  productName: string | null
+  productName: string | null,
+  change?: { from: string | null; to: string | null } | null
 ): string {
   const parts: string[] = []
   // App 名可读（非 bundleId 占位）就用名字，否则退回 bundleId 末段
   const app = appName && appName !== bundleId ? appName : bundleId?.split('.').pop() ?? ''
   if (app) parts.push(app)
 
-  const product = [
-    // products 目录里的正式名优先，未同步到时回退 product_id 末段
-    productName ?? productDisplay(tx?.productId, bundleId ?? tx?.bundleId),
-    periodLabel(tx ? inferPeriod(tx) : null),
-    // 金额已提到通知标题，正文不再重复
-  ]
-    .filter(Boolean)
-    .join(' ')
+  // 换购只说清「从什么换成什么」——周期信息已经在产品名里，再拼一遍反而更长更糊
+  const product = change
+    ? change.from && change.to && change.from !== change.to
+      ? `${change.from} → ${change.to}`
+      : change.to ?? change.from ?? ''
+    : [
+        // products 目录里的正式名优先，未同步到时回退 product_id 末段
+        productName ?? productDisplay(tx?.productId, bundleId ?? tx?.bundleId),
+        periodLabel(tx ? inferPeriod(tx) : null),
+        // 金额已提到通知标题，正文不再重复
+      ]
+        .filter(Boolean)
+        .join(' ')
   if (product) parts.push(product)
 
   const country = countryDisplay(tx?.storefront)
@@ -294,7 +296,23 @@ export async function processNotification(
       }
     }
   }
-  await db.prepare('UPDATE notifications_raw SET app_id = ? WHERE uuid = ?').bind(appId, rawUuid).run()
+  // 订阅号一并落到原始通知上：不产生新交易的事件（降级、取消续费、过期…）在 transactions 里
+  // 只是 upsert 到已有行，光靠 raw_uuid 反查不到它们，订阅历史时间线要靠这一列拉全
+  await db
+    .prepare('UPDATE notifications_raw SET app_id = ?, original_transaction_id = ? WHERE uuid = ?')
+    .bind(appId, tx?.originalTransactionId ?? null, rawUuid)
+    .run()
+
+  // 换购（升级/降级）：升级立即换期，本次交易已经是新产品，「换购前是什么」只有 upsert 之前
+  // 的订阅行还记得 —— 必须在下面写库之前取，否则就被新产品覆盖了
+  let prevProductId: string | null = null
+  if (type === 'DID_CHANGE_RENEWAL_PREF' && tx) {
+    const row = await db
+      .prepare('SELECT product_id FROM subscriptions WHERE original_transaction_id = ?')
+      .bind(tx.originalTransactionId)
+      .first<{ product_id: string }>()
+    prevProductId = row?.product_id ?? null
+  }
 
   // 交易明细 + 订阅状态（同一批语句）
   if (tx) {
@@ -304,15 +322,27 @@ export async function processNotification(
     await db.batch(stmts)
   }
 
+  // 换购两端的产品：升级立即生效（本次交易 = 新产品，旧的来自订阅行），
+  // 降级下期生效（本次交易仍是旧产品，新的看 autoRenewProductId）
+  const change =
+    type === 'DID_CHANGE_RENEWAL_PREF' && tx
+      ? subtype === 'UPGRADE'
+        ? { fromId: prevProductId, toId: tx.productId }
+        : { fromId: tx.productId, toId: renewal?.autoRenewProductId ?? tx.productId }
+      : null
+
   // 产品正式名（fetch-products 每日同步的 ASC referenceName）
-  let productName: string | null = null
-  if (tx?.productId) {
-    const row = await db
-      .prepare('SELECT name FROM products WHERE product_id = ?')
-      .bind(tx.productId)
-      .first<{ name: string }>()
-    productName = row?.name ?? null
+  const wantNames = [...new Set([tx?.productId, change?.fromId, change?.toId].filter((v): v is string => !!v))]
+  const nameOf = new Map<string, string>()
+  if (wantNames.length) {
+    const rows = await db
+      .prepare(`SELECT product_id, name FROM products WHERE product_id IN (${wantNames.map(() => '?').join(',')})`)
+      .bind(...wantNames)
+      .all<{ product_id: string; name: string }>()
+    for (const r of rows.results) nameOf.set(r.product_id, r.name)
   }
+  const productName = tx?.productId ? nameOf.get(tx.productId) ?? null : null
+  const display = (id: string | null) => (id ? nameOf.get(id) ?? productDisplay(id, bundleId ?? tx?.bundleId) : null)
 
   const titleFn = NOTIFY_TITLES[type]
   const baseTitle = titleFn?.(subtype) ?? null
@@ -320,7 +350,13 @@ export async function processNotification(
   const neg = type === 'REFUND' || type === 'REVOKE'
   const amt = tx?.price != null && tx.price > 0 ? money(tx.price, tx.currency) : null
   const title = baseTitle != null && amt ? `${baseTitle} ${neg ? '−' : '+'}${amt}` : baseTitle
-  const body = buildBody(appName, bundleId, tx, productName)
+  const body = buildBody(
+    appName,
+    bundleId,
+    tx,
+    productName,
+    change ? { from: display(change.fromId), to: display(change.toId) } : null
+  )
   return {
     title: title ?? `${type}${subtype ? `/${subtype}` : ''}`,
     body,

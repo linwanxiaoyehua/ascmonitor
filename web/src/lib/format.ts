@@ -122,6 +122,21 @@ export function productDisplay(productId?: string | null, bundleId?: string | nu
   return parts.length > 2 ? parts.slice(-2).join('.') : productId
 }
 
+/**
+ * 换购两端的展示名："年付会员 → 月付会员"。
+ * 升级前的套餐靠回溯历史交易推断，回溯不到（如接入前就存在的订阅）时只说换到了什么；
+ * 两端相同（取消降级）时只说当前套餐。
+ */
+export function changeText(
+  change: { fromId: string | null; fromName: string | null; toId: string | null; toName: string | null },
+  bundleId?: string | null
+): string {
+  const from = change.fromId ? change.fromName ?? productDisplay(change.fromId, bundleId) : ''
+  const to = change.toId ? change.toName ?? productDisplay(change.toId, bundleId) : ''
+  if (from && to && from !== to) return `${from} → ${to}`
+  return to || from
+}
+
 const PERIOD_LABELS: Record<string, string> = { P1W: '周付', P1M: '月付', P3M: '季付', P6M: '半年付', P1Y: '年付' }
 
 /** ISO 8601 周期 → 中文，如 "P1M" → "月付" */

@@ -24,9 +24,11 @@ CREATE TABLE IF NOT EXISTS notifications_raw (
   subtype TEXT,
   signed_payload TEXT NOT NULL,
   decoded_json TEXT NOT NULL,
-  received_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+  received_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  original_transaction_id TEXT     -- 所属订阅 / 原始交易；订阅历史时间线按它拉全部事件
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_received ON notifications_raw(received_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_otid ON notifications_raw(original_transaction_id, received_at);
 
 -- 交易明细（一次性购买 + 订阅每期）
 CREATE TABLE IF NOT EXISTS transactions (

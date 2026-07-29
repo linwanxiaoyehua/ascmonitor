@@ -1,33 +1,15 @@
 // 动态合流行渲染：ASSN 事件 / 告警 统一外观
 // 总览「今日动态」预览与动态页共用
 
+import { useState } from 'react'
 import type { ActivityItem } from '../lib/api'
-import { appLabelOf, countryDisplay, productDisplay, subtypeLabel, REVENUE_TYPES } from '../lib/format'
+import { eventMeta, type Tone } from '../lib/event-meta'
+import { appLabelOf, changeText, countryDisplay, productDisplay, REVENUE_TYPES } from '../lib/format'
+import { fmtMoney } from '../lib/money'
 import { AppIcon } from './AppIcon'
 import { Icon, type IconName } from './Icon'
+import { SubTimeline } from './SubTimeline'
 import { Badge, ListRow } from './ui'
-
-type Tone = 'success' | 'info' | 'danger' | 'warning' | 'accent' | 'neutral'
-
-const TYPE_META: Record<string, { label: string; icon: IconName; tone: Tone }> = {
-  SUBSCRIBED: { label: '新订阅', icon: 'zap', tone: 'success' },
-  DID_RENEW: { label: '自动续费', icon: 'refresh', tone: 'success' },
-  ONE_TIME_CHARGE: { label: '新购买', icon: 'creditCard', tone: 'success' },
-  OFFER_REDEEMED: { label: '优惠兑换', icon: 'gift', tone: 'info' },
-  REFUND: { label: '退款', icon: 'trendingDown', tone: 'danger' },
-  REFUND_DECLINED: { label: '退款被拒', icon: 'trendingDown', tone: 'neutral' },
-  REFUND_REVERSED: { label: '退款撤销', icon: 'refresh', tone: 'info' },
-  REVOKE: { label: '共享撤销', icon: 'x', tone: 'danger' },
-  DID_CHANGE_RENEWAL_STATUS: { label: '续费状态变更', icon: 'refresh', tone: 'warning' },
-  DID_CHANGE_RENEWAL_PREF: { label: '升级 / 降级', icon: 'trendingUp', tone: 'info' },
-  DID_FAIL_TO_RENEW: { label: '扣款失败', icon: 'alertTriangle', tone: 'danger' },
-  EXPIRED: { label: '订阅过期', icon: 'clock', tone: 'neutral' },
-  GRACE_PERIOD_EXPIRED: { label: '宽限期结束', icon: 'clock', tone: 'danger' },
-  PRICE_INCREASE: { label: '价格上调', icon: 'trendingUp', tone: 'warning' },
-  CONSUMPTION_REQUEST: { label: '请求退款', icon: 'info', tone: 'neutral' },
-  RENEWAL_EXTENDED: { label: '续期顺延', icon: 'clock', tone: 'info' },
-  TEST: { label: '测试通知', icon: 'flask', tone: 'neutral' },
-}
 
 const ALERT_META: Record<string, { icon: IconName; tone: Tone }> = {
   new_bad_review: { icon: 'message', tone: 'danger' },
@@ -59,36 +41,40 @@ const BUILD_BADGES: Record<string, string> = {
  */
 const stripLeadingEmoji = (t: string) => t.replace(/^\p{Extended_Pictographic}️?\s*/u, '')
 
-export function ActivityRow({ item }: { item: ActivityItem }) {
-  if (item.kind === 'alert') {
-    const buildIcon = BUILD_ICONS[item.alertKind]
-    // 构建事件：用后端给的 tone，配 App 图标；普通告警沿用固定的规则配色
-    const meta = buildIcon
-      ? { icon: buildIcon, tone: (item.tone ?? 'info') as Tone }
-      : ALERT_META[item.alertKind] ?? { icon: 'bell' as IconName, tone: 'danger' as Tone }
-    const badgeLabel = BUILD_BADGES[item.alertKind]
-    return (
-      <ListRow
-        leading={
-          item.appIcon
-            ? <AppIcon url={item.appIcon} name={item.appName ?? ''} size={34} />
-            : <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={18} /></span>
-        }
-        title={stripLeadingEmoji(item.title)}
-        badges={
-          badgeLabel ? (
-            <Badge tone={meta.tone === 'accent' ? 'info' : meta.tone}>{badgeLabel}</Badge>
-          ) : (
-            <Badge tone="danger">告警</Badge>
-          )
-        }
-        detail={item.body?.split('\n')[0]}
-        time={item.ts}
-      />
-    )
-  }
+function AlertRow({ item }: { item: Extract<ActivityItem, { kind: 'alert' }> }) {
+  const buildIcon = BUILD_ICONS[item.alertKind]
+  // 构建事件：用后端给的 tone，配 App 图标；普通告警沿用固定的规则配色
+  const meta = buildIcon
+    ? { icon: buildIcon, tone: (item.tone ?? 'info') as Tone }
+    : ALERT_META[item.alertKind] ?? { icon: 'bell' as IconName, tone: 'danger' as Tone }
+  const badgeLabel = BUILD_BADGES[item.alertKind]
+  return (
+    <ListRow
+      leading={
+        item.appIcon
+          ? <AppIcon url={item.appIcon} name={item.appName ?? ''} size={34} />
+          : <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={18} /></span>
+      }
+      title={stripLeadingEmoji(item.title)}
+      badges={
+        badgeLabel ? (
+          <Badge tone={meta.tone === 'accent' ? 'info' : meta.tone}>{badgeLabel}</Badge>
+        ) : (
+          <Badge tone="danger">告警</Badge>
+        )
+      }
+      detail={item.body?.split('\n')[0]}
+      time={item.ts}
+    />
+  )
+}
 
-  const meta = TYPE_META[item.type] ?? { label: item.type, icon: 'activity' as IconName, tone: 'neutral' as Tone }
+function EventRow({ item }: { item: Extract<ActivityItem, { kind: 'event' }> }) {
+  // 交易 / 订阅类事件可以点开，看这条订阅从首次订阅到现在的每一次续费、升降级、退款
+  const otid = item.originalTransactionId
+  const [open, setOpen] = useState(false)
+
+  const meta = eventMeta(item.type, item.subtype)
   const appLabel = appLabelOf(item.appName, item.bundleId)
   const isRevenue = REVENUE_TYPES.has(item.type)
   const isRefund = item.type === 'REFUND'
@@ -98,36 +84,55 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   const isTrial = item.isTrial === true
   const showAmount = (isRevenue || isRefund || isRefundRequest) && item.priceMilli != null && (item.priceMilli > 0 || isTrial)
   const amountSign = isRefund ? 'neg' : isRefundRequest ? undefined : 'pos'
+
+  // 换购事件说「从哪个套餐换到哪个套餐」——只写「升级 / 降级」看不出到底做了什么；
+  // 降级不产生交易，钱的变化只能靠 renewalInfo 里的下期续费价说明
+  const change = item.productChange
+  const renewalPrice =
+    change?.renewalPriceMilli != null && change.renewalPriceMilli > 0
+      ? `下期 ${fmtMoney(change.renewalPriceMilli, change.renewalCurrency)}`
+      : null
   const detail = [
     appLabel,
-    item.productName ?? productDisplay(item.productId, item.bundleId),
+    change ? changeText(change, item.bundleId) : item.productName ?? productDisplay(item.productId, item.bundleId),
+    renewalPrice,
     countryDisplay(item.country),
   ]
     .filter(Boolean)
     .join(' · ')
 
   return (
-    <ListRow
-      leading={
-        item.appIcon
-          ? <AppIcon url={item.appIcon} name={appLabel} size={34} />
-          : <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={18} /></span>
-      }
-      title={
-        <>
-          {meta.label}
-          {item.subtype && <span className="sub-pill">{subtypeLabel(item.subtype)}</span>}
-        </>
-      }
-      badges={
-        <>
-          {isTrial && <Badge tone="info">试用</Badge>}
-          {item.environment === 'Sandbox' && <Badge tone="neutral">沙盒</Badge>}
-        </>
-      }
-      detail={detail}
-      amount={showAmount ? { milli: item.priceMilli, currency: item.currency, sign: amountSign } : undefined}
-      time={item.ts}
-    />
+    <div>
+      <ListRow
+        leading={
+          item.appIcon
+            ? <AppIcon url={item.appIcon} name={appLabel} size={34} />
+            : <span className={`row-icon tone-${meta.tone}`}><Icon name={meta.icon} size={18} /></span>
+        }
+        title={
+          <>
+            {meta.label}
+            {meta.note && <span className="sub-pill">{meta.note}</span>}
+          </>
+        }
+        badges={
+          <>
+            {isTrial && <Badge tone="info">试用</Badge>}
+            {item.environment === 'Sandbox' && <Badge tone="neutral">沙盒</Badge>}
+          </>
+        }
+        detail={detail}
+        amount={showAmount ? { milli: item.priceMilli, currency: item.currency, sign: amountSign } : undefined}
+        time={item.ts}
+        trailing={otid ? 'chevron' : undefined}
+        chevronOpen={open}
+        onPress={otid ? () => setOpen((v) => !v) : undefined}
+      />
+      {open && otid && <SubTimeline otid={otid} bundleId={item.bundleId} />}
+    </div>
   )
+}
+
+export function ActivityRow({ item }: { item: ActivityItem }) {
+  return item.kind === 'alert' ? <AlertRow item={item} /> : <EventRow item={item} />
 }

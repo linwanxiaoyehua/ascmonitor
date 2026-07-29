@@ -121,17 +121,24 @@ export interface SubRow {
   app_bundle_id: string | null
 }
 
+/** 一条订阅（或一次性购买）的完整历史：/api/subscriptions/:otid/timeline。
+    以原始通知为主线，含不产生交易的事件（升降级、取消续费、过期…） */
 export interface TimelineRow {
-  transaction_id: string
-  product_id: string
-  price_milli: number | null
-  currency: string | null
-  event_type: string
-  refunded: number
-  purchase_date: number | null
-  notification_type: string | null
+  id: string
+  ts: number
+  type: string
   subtype: string | null
-  received_at: number | null
+  transactionId: string | null
+  productId: string | null
+  productName: string | null
+  priceMilli: number | null
+  currency: string | null
+  country: string | null
+  expiresDate: number | null
+  refunded: boolean
+  isTrial: boolean
+  environment: string | null
+  productChange: ProductChange | null
 }
 
 export interface PurchaseRow {
@@ -173,6 +180,17 @@ export interface AlertRule {
   enabled: number
 }
 
+/** 订阅换购（升级 / 降级 / 取消降级）的「旧 → 新」产品，由后端补齐两端 */
+export interface ProductChange {
+  fromId: string | null
+  fromName: string | null
+  toId: string | null
+  toName: string | null
+  /** 下期续费价：降级不产生交易，只能从 renewalInfo 拿 */
+  renewalPriceMilli: number | null
+  renewalCurrency: string | null
+}
+
 /** /api/activity 合流项：ASSN 事件或告警 */
 export type ActivityItem =
   | {
@@ -192,6 +210,9 @@ export type ActivityItem =
       currency: string | null
       country: string | null
       isTrial?: boolean
+      /** 所属订阅 / 原始交易：点开看这条订阅的完整历史 */
+      originalTransactionId?: string | null
+      productChange?: ProductChange | null
     }
   | {
       kind: 'alert'

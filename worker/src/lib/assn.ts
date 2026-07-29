@@ -240,4 +240,7 @@ export interface RenewalInfo {
   gracePeriodExpiresDate?: number
   isInBillingRetryPeriod?: boolean
   renewalDate?: number
+  /** 下期续费价（milli-units）：降级/涨价时用来说明「下期实际付多少」 */
+  renewalPrice?: number
+  currency?: string
 }

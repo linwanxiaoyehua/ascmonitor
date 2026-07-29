@@ -45,6 +45,13 @@ export async function reprocessJob(
     const renewal = decodeJwsPayload<RenewalInfo>(payload.data?.signedRenewalInfo)
     if (!tx) continue
     const subtype = row.subtype ?? undefined
+    // 回填通知自身的订阅号（0008 迁移新增列）：不产生新交易的事件靠 raw_uuid 反查不到，
+    // 只有在这里解 JWS 才能认领 —— 订阅历史时间线依赖它
+    stmts.push(
+      db
+        .prepare('UPDATE notifications_raw SET original_transaction_id = ? WHERE uuid = ?')
+        .bind(tx.originalTransactionId, row.uuid)
+    )
     stmts.push(buildTxStatement(db, tx, row.type, subtype, row.app_id, row.uuid))
     // 回放时用事件自身时间做状态判定与 updated_at，避免"当前时间"污染历史语义
     const subStmt = buildSubStatement(db, tx, renewal, row.type, subtype, row.app_id, row.received_at)

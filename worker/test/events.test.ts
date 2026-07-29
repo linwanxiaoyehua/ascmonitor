@@ -83,6 +83,19 @@ describe('沙盒环境落库', () => {
   })
 })
 
+describe('交易的 event_type 不被后续事件改写', () => {
+  // 取消续费 / 降级 / 扣款失败 / 过期都带着同一份 signedTransactionInfo 回来，
+  // 一旦 upsert 覆盖了 event_type，那笔续费就不再匹配收入口径 —— 收入、MRR、LTV 全少算
+  it('ON CONFLICT 分支不更新 event_type / event_subtype', () => {
+    const { db, calls } = fakeDb()
+    buildTxStatement(db, tx(), 'DID_CHANGE_RENEWAL_STATUS', 'AUTO_RENEW_DISABLED', 1, 'uuid-2')
+    const update = calls[0].sql.split('DO UPDATE SET')[1]
+    expect(update).toBeDefined()
+    expect(update).not.toMatch(/^\s*event_type\s*=/m)
+    expect(update).not.toMatch(/^\s*event_subtype\s*=/m)
+  })
+})
+
 describe('resolveStatus', () => {
   it('SUBSCRIBED → active；试用交易 → trial', () => {
     expect(resolveStatus('SUBSCRIBED', 'INITIAL_BUY', tx(), renewal, NOW)).toBe('active')

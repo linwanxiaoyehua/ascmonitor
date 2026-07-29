@@ -4,15 +4,16 @@
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import {
-  api, type PurchaseRow, type Reconciliation, type SubRow, type TimelineRow,
+  api, type PurchaseRow, type Reconciliation, type SubRow,
 } from '../../lib/api'
 import { useAppFilter, withAppParam } from '../../lib/app-filter'
 import { fmtMoney, fmtUsd } from '../../lib/money'
 import {
-  appLabelOf, countryDisplay, countryFlag, countryName, expiresDisplay, periodLabel, productDisplay, subtypeLabel, timeAgo,
+  appLabelOf, countryDisplay, countryFlag, countryName, expiresDisplay, periodLabel, productDisplay, timeAgo,
 } from '../../lib/format'
 import { AppIcon } from '../../components/AppIcon'
 import { Icon } from '../../components/Icon'
+import { SubTimeline } from '../../components/SubTimeline'
 import {
   Badge, type BadgeTone, CaliberTag, EmptyState, ListRow, LoadMore, Section, SegmentedControl, Skeleton,
 } from '../../components/ui'
@@ -24,17 +25,6 @@ const STATUS_LABELS: Record<string, string> = {
   billing_retry: '扣款重试',
   expired: '已过期',
   revoked: '已退订',
-}
-
-const TIMELINE_LABELS: Record<string, string> = {
-  SUBSCRIBED: '订阅',
-  DID_RENEW: '续费',
-  ONE_TIME_CHARGE: '购买',
-  REFUND: '退款',
-  DID_CHANGE_RENEWAL_STATUS: '续费状态变更',
-  DID_CHANGE_RENEWAL_PREF: '升降级',
-  DID_FAIL_TO_RENEW: '扣款失败',
-  EXPIRED: '过期',
 }
 
 const PURCHASE_TYPES: Record<string, string> = {
@@ -80,36 +70,6 @@ function ReconciliationCard() {
         </div>
       </div>
     </Section>
-  )
-}
-
-function Timeline({ otid }: { otid: string }) {
-  const { data: rows, isPending } = useQuery({
-    queryKey: ['sub-timeline', otid],
-    queryFn: () => api<TimelineRow[]>(`/api/subscriptions/${otid}/timeline`),
-  })
-
-  if (isPending) return <div className="skeleton h-timeline" />
-  if (!rows?.length) return <div className="muted timeline">暂无交易记录</div>
-  return (
-    <div className="timeline">
-      {rows.map((t) => {
-        const type = t.notification_type ?? t.event_type
-        const label = TIMELINE_LABELS[type] ?? type
-        const sub = subtypeLabel(t.subtype)
-        return (
-          <div className="timeline-item" key={t.transaction_id + type}>
-            <span className={`timeline-dot${t.refunded || type === 'REFUND' ? ' neg' : ''}`} />
-            <span className="timeline-label">
-              {label}
-              {sub && <span className="muted"> · {sub}</span>}
-            </span>
-            <span className="timeline-amount num">{fmtMoney(t.price_milli, t.currency)}</span>
-            <span className="timeline-time">{timeAgo(t.purchase_date ?? t.received_at ?? 0)}</span>
-          </div>
-        )
-      })}
-    </div>
   )
 }
 
@@ -174,7 +134,7 @@ function SubsList() {
           chevronOpen={open}
           onPress={() => setOpenTimeline(open ? null : s.original_transaction_id)}
         />
-        {open && <Timeline otid={s.original_transaction_id} />}
+        {open && <SubTimeline otid={s.original_transaction_id} bundleId={s.app_bundle_id} />}
       </div>
     )
   }

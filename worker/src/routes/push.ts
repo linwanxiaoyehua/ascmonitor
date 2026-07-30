@@ -1,13 +1,14 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
 import { generateVapidKeys, sendWebPush, type VapidKeys } from '../lib/webpush'
+import { authenticate } from '../lib/auth'
 
 export const push = new Hono<{ Bindings: Env }>()
 
-// 与 /api 相同的 Bearer 鉴权
+// 与 /api 同一套鉴权（Cloudflare Access 优先，token 兜底）
 push.use('*', async (c, next) => {
-  const row = await c.env.DB.prepare("SELECT value FROM config WHERE key = 'access_token'").first<{ value: string }>()
-  if (!row || c.req.header('Authorization') !== `Bearer ${row.value}`) return c.json({ error: 'unauthorized' }, 401)
+  const result = await authenticate(c.env.DB, c.req.raw)
+  if (!result.ok) return c.json({ error: 'unauthorized' }, 401)
   return next()
 })
 

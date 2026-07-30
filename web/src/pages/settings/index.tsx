@@ -8,8 +8,8 @@
 
 import { useState } from 'react'
 import { useParams } from 'wouter'
-import { useQuery } from '@tanstack/react-query'
-import { api, clearToken, getToken, type AppRow, type DataHealth } from '../../lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, ApiError, clearToken, setToken, type AppRow, type AuthStatus, type DataHealth } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
 import { toast } from '../../lib/toast'
 import { getTheme, setTheme, type Theme } from '../../lib/theme'
@@ -48,31 +48,175 @@ import { AlertsSection } from './Alerts'
 import { BuildsSection } from './Builds'
 import { DataSection } from './Data'
 
-/** 账户与安全：Access Token（掩码显示 + 复制 + 退出登录），对齐 设置.dc.html 末尾 */
+/**
+ * 登录与安全。
+ * 两条认证路径：Cloudflare Access（Zero Trust 托管登录，推荐）与 Access Token（兜底）。
+ * 兜底的意义是别把自己锁在门外 —— Access 配错时还能用 token 进来改配置；
+ * 确认 Access 真的生效（本行显示为 Access + 邮箱）后再关掉它。
+ */
 function AccountSection() {
-  const token = getToken() ?? ''
-  const masked = token ? `asc_${'•'.repeat(16)}${token.slice(-4)}` : '未登录'
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(token); toast.success('已复制 Access Token') } catch { /* http 无剪贴板权限 */ }
+  const queryClient = useQueryClient()
+  const { data: status } = useQuery({ queryKey: ['auth-status'], queryFn: () => api<AuthStatus>('/api/auth/status') })
+  const [editing, setEditing] = useState(false)
+  const [teamDomain, setTeamDomain] = useState('')
+  const [aud, setAud] = useState('')
+  const [freshToken, setFreshToken] = useState('')
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['auth-status'] })
+
+  const saveAccess = useMutation({
+    mutationFn: () =>
+      api<AuthStatus>('/api/auth/access', { method: 'PUT', body: JSON.stringify({ teamDomain, aud }) }),
+    onSuccess: () => {
+      toast.success(teamDomain && aud ? 'Access 已配置，刷新页面走 Cloudflare 登录' : 'Access 校验已关闭')
+      setEditing(false)
+      setAud('')
+      refresh()
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof ApiError && /bad_team_domain/.test(e.message)
+        ? '团队域名格式应为 xxx.cloudflareaccess.com'
+        : e instanceof ApiError && /bad_aud/.test(e.message)
+          ? 'AUD 应为 64 位十六进制'
+          : '保存失败'
+      toast.error(msg)
+    },
+  })
+
+  const setFallback = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api<AuthStatus>('/api/auth/token-fallback', { method: 'PUT', body: JSON.stringify({ enabled }) }),
+    onSuccess: (_d, enabled) => {
+      toast.success(enabled ? '已开启 Token 兜底' : 'Token 兜底已关闭，此后只认 Access')
+      refresh()
+    },
+    onError: (e: unknown) => {
+      toast.error(
+        e instanceof ApiError && /access_not_active/.test(e.message)
+          ? '当前这次访问不是 Access 认证的 —— 先确认 Access 生效再关兜底'
+          : '操作失败'
+      )
+    },
+  })
+
+  const rotate = useMutation({
+    mutationFn: () => api<{ token: string }>('/api/auth/rotate-token', { method: 'POST' }),
+    onSuccess: ({ token }) => {
+      setToken(token) // 本机立即换新，避免自己被旧 token 顶下线
+      setFreshToken(token)
+      refresh()
+    },
+    onError: () => toast.error('轮换失败'),
+  })
+
+  const logout = () => {
+    clearToken()
+    // Access 模式下还要退掉 Cloudflare 的会话，否则刷新即自动登录
+    if (status?.method === 'access') location.href = '/cdn-cgi/access/logout'
+    else location.reload()
   }
-  const logout = () => { clearToken(); location.reload() }
+
+  const isAccess = status?.method === 'access'
   return (
-    <Section title="账户与安全">
+    <Section title="登录与安全">
       <div className="list">
         <ListRow
-          leading={<span className="row-icon tone-accent"><Icon name="key" size={16} /></span>}
-          title="Access Token"
-          detail={masked}
-          trailing={<span className="row-action-text">复制</span>}
-          onPress={copy}
+          leading={<span className={`row-icon ${isAccess ? 'tone-success' : 'tone-accent'}`}><Icon name="key" size={16} /></span>}
+          title={isAccess ? 'Cloudflare Access' : 'Access Token'}
+          detail={
+            isAccess
+              ? [status?.email, status?.sessionExpiresAt ? `会话至 ${new Date(status.sessionExpiresAt).toLocaleString()}` : null]
+                  .filter(Boolean).join(' · ')
+              : status?.accessConfigured
+                ? 'Access 已配置但本次访问未通过 —— 用受保护的域名打开'
+                : '本机 Token 认证（建议改用 Cloudflare Access）'
+          }
+        />
+        {status?.accessConfigured && !editing && (
+          <ListRow
+            leading={<span className="row-icon tone-info"><Icon name="settings" size={16} /></span>}
+            title="Access 配置"
+            detail={`${status.accessTeamDomain} · AUD ${status.accessAud}`}
+            trailing="chevron"
+            onPress={() => { setTeamDomain(status.accessTeamDomain ?? ''); setEditing(true) }}
+          />
+        )}
+      </div>
+
+      {(!status?.accessConfigured || editing) && (
+        <div className="panel pad mt-2">
+          <div className="field">
+            <label htmlFor="access-team">团队域名</label>
+            <input
+              id="access-team"
+              value={teamDomain}
+              onChange={(e) => setTeamDomain(e.target.value)}
+              placeholder="your-team.cloudflareaccess.com"
+              autoComplete="off" autoCapitalize="none" spellCheck={false}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="access-aud">Application Audience (AUD) tag</label>
+            <input
+              id="access-aud"
+              value={aud}
+              onChange={(e) => setAud(e.target.value)}
+              placeholder="64 位十六进制，Zero Trust 应用概览里复制"
+              autoComplete="off" autoCapitalize="none" spellCheck={false}
+            />
+          </div>
+          <div className="hstack mt-2">
+            <button className="primary flex-1" disabled={saveAccess.isPending} onClick={() => saveAccess.mutate()}>
+              {saveAccess.isPending ? '保存中…' : '保存'}
+            </button>
+            {editing && <button className="ghost" onClick={() => { setEditing(false); setAud('') }}>取消</button>}
+          </div>
+          <p className="muted hint">
+            Zero Trust → Access → Applications 新建自助应用，域名填本站；
+            再单独给 <code>/webhook/*</code> 建一条 Bypass 策略（Apple 与 ASC 无法登录）。
+            两项留空即关闭 Access 校验。
+          </p>
+        </div>
+      )}
+
+      {freshToken && (
+        <div className="panel pad mt-2">
+          <p className="muted mb-2">新 Token（<strong>只显示这一次</strong>，本机已自动换上）</p>
+          <div className="panel token-box"><code className="num t-detail">{freshToken}</code></div>
+          <button className="ghost mt-2" onClick={() => setFreshToken('')}>我已保存</button>
+        </div>
+      )}
+
+      <div className="list mt-2">
+        {status?.accessConfigured && (
+          <ListRow
+            leading={<span className={`row-icon ${status.tokenFallback ? 'tone-warning' : 'tone-success'}`}><Icon name="wrench" size={16} /></span>}
+            title={status.tokenFallback ? '关闭 Token 兜底（只认 Access）' : '开启 Token 兜底'}
+            detail={
+              status.tokenFallback
+                ? '兜底开启期间，拿到 Token 的人仍能绕过 Access'
+                : '当前只接受 Cloudflare Access；Access 出问题时需用 wrangler 改库才能恢复'
+            }
+            trailing="chevron"
+            onPress={() => setFallback.mutate(!status.tokenFallback)}
+          />
+        )}
+        <ListRow
+          leading={<span className="row-icon tone-accent"><Icon name="refresh" size={16} /></span>}
+          title="轮换 Access Token"
+          detail="旧 Token 立即失效；服务端只存哈希，明文只在轮换时显示一次"
+          trailing="chevron"
+          onPress={() => rotate.mutate()}
         />
         <ListRow
           leading={<span className="row-icon tone-danger"><Icon name="x" size={16} /></span>}
-          title={<span className="neg">退出登录（清除本机 Token）</span>}
+          title={<span className="neg">{isAccess ? '退出登录（含 Cloudflare 会话）' : '退出登录（清除本机 Token）'}</span>}
           onPress={logout}
         />
       </div>
-      <p className="muted hint">Token 存于本机浏览器；退出后需重新粘贴才能访问。</p>
+      <p className="muted hint">
+        Token 明文只存在本机浏览器，服务端只有 SHA-256；连续 8 次认证失败会锁定 15 分钟。
+      </p>
     </Section>
   )
 }

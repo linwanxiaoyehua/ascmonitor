@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { Route, Switch } from 'wouter'
-import { api, clearToken, getToken, setToken } from './lib/api'
+import { api, clearToken, getToken, setToken, type AuthStatus } from './lib/api'
 import { UNAUTHORIZED_EVENT } from './lib/query'
 import { AppShell } from './components/AppShell'
 import { Icon } from './components/Icon'
@@ -32,7 +32,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     const previous = getToken()
     setToken(candidate)
     try {
-      await api('/api/apps')
+      await api('/api/auth/status')
       onLogin()
     } catch {
       // 校验失败不能把无效 token 留在 localStorage
@@ -145,12 +145,10 @@ export function App() {
   const [authed, setAuthed] = useState(false)
   const [checking, setChecking] = useState(true)
 
+  // 无条件探一次：走 Cloudflare Access 时本机没有 token，认证靠 cookie，
+  // 不能因为「localStorage 里没 token」就先弹登录页
   useEffect(() => {
-    if (!getToken()) {
-      setChecking(false)
-      return
-    }
-    api('/api/apps')
+    api<AuthStatus>('/api/auth/status')
       .then(() => setAuthed(true))
       .catch(() => {})
       .finally(() => setChecking(false))

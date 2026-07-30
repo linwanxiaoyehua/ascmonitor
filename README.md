@@ -59,8 +59,43 @@ npm run deploy
 
 新差评（≤2 星）即时推送 · 24h 差评率 ≥30% · 日收入较 7 日均值降 ≥30% · Webhook 静默 24h 自检。可在「设置 → 通知与告警」开关与调参；告警历史在「动态」页筛选查看。
 
+## 登录方式（推荐 Cloudflare Access）
+
+默认是单个 Access Token（服务端只存 SHA-256，明文只在初始化/轮换时显示一次）。
+更好的做法是把登录交给 Cloudflare Zero Trust —— 邮箱 OTP / Google / GitHub 登录，
+会话自动过期、有审计日志，本地不再保管任何长期凭证。免费层 50 seats。
+
+配置顺序（**先配 Access，确认生效后再关 token 兜底**，否则配错就把自己锁在门外）：
+
+1. Zero Trust → Access → Applications → **Add a self-hosted application**
+   - Application domain：`asc.你的域名`（留空 path = 保护整站）
+   - Policy：Allow，条件用 Emails = 你的邮箱
+   - 建完在应用概览复制 **Application Audience (AUD) tag**（64 位十六进制）
+2. **再建第二个应用给 webhook 放行**：domain 同上、path 填 `webhook`，
+   Policy 选 **Bypass / Everyone**。Apple 与 ASC 的服务器没法登录，不放行会直接断流。
+   （若 ASSN URL 仍指向 `*.workers.dev`，那条不经 Cloudflare 代理，本步可跳过）
+3. 本站「设置 → 登录与安全」填团队域名（`xxx.cloudflareaccess.com`）与 AUD → 保存
+4. 刷新页面，走一次 Cloudflare 登录。该页首行显示 **Cloudflare Access + 你的邮箱** 即已生效
+5. 点「关闭 Token 兜底」—— 此后只认 Access。这一步会校验「当次请求确实是 Access 认证的」，
+   没生效时点不动，防的就是把自己关在外面
+
+Worker 侧只做验签：JWKS 公钥（缓存 1 小时）+ `aud` 命中本应用 + `iss` 是本团队 + 时间窗。
+`workers.dev` 域名不经 Cloudflare 代理、Access 管不到它 —— 关闭 token 兜底后那条路径上的
+`/api`、`/push` 会一律拒绝（`/webhook` 不受影响，它靠 Apple 签名而非登录态）。
+
+Access 出问题要恢复兜底：
+
+```
+npx wrangler d1 execute ascmonitor --remote --command \
+  "UPDATE config SET value='on' WHERE key='auth_token_fallback'"
+```
+
 ## 安全说明
 
 - ASSN V2 验签：JWS x5c 证书链逐级验证 + Apple Root CA - G3 指纹固定 + 叶证书有效期检查
+- ASC Webhook 验签：HMAC-SHA256 常数时间校验（`subtle.verify`，不做字符串比较）
 - 幂等：`notificationUUID` 主键去重，Apple 重试不会重复入库
-- 所有 API 走 Bearer Token；敏感配置（.p8 私钥等）只写不读回
+- 认证：Cloudflare Access（JWT 验签）优先，Access Token 兜底；token 服务端只存 SHA-256、
+  常数时间比较、连续 8 次失败锁 15 分钟、可随时轮换
+- 鉴权相关的 config 键不走通用 `/api/config` 路径：读会泄露凭证，写能绕过 `/auth/*` 的检查
+- 敏感配置（.p8 私钥等）只写不读回

@@ -1,6 +1,10 @@
-// API 客户端：Bearer token 存 localStorage
+// API 客户端。
+// 认证有两条路：Cloudflare Access（cookie，浏览器自动带，前端不用管）与 Access Token 兜底。
+// token 仍存 localStorage，但 Access 启用后可以在设置页关掉兜底、清掉本机 token。
 
 const TOKEN_KEY = 'ascmonitor_token'
+/** 上次因 Access 会话失效而刷新的时间戳（sessionStorage）：防止离线时反复刷新 */
+const RELOAD_KEY = 'ascmonitor_access_reload_at'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -22,16 +26,43 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
-  const res = await fetch(path, {
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    })
+  } catch (err) {
+    // Access 会话过期时，Cloudflare 把请求 302 到跨域登录页，fetch 因此直接失败。
+    // 这时要做一次导航级请求，浏览器才会正常显示 Cloudflare 的登录界面。
+    // 离线也会走到这里，所以限一分钟一次，避免断网时反复刷新。
+    const last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0)
+    if (navigator.onLine && Date.now() - last > 60_000) {
+      sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
+      location.reload()
+    }
+    throw err
+  }
   if (!res.ok) throw new ApiError(res.status, await res.text())
   return res.json() as Promise<T>
+}
+
+/** 当前认证状态（/api/auth/status），设置页与启动门控共用 */
+export interface AuthStatus {
+  method: 'access' | 'token' | null
+  /** Access 身份邮箱（token 认证时为 null） */
+  email: string | null
+  accessConfigured: boolean
+  accessTeamDomain: string | null
+  /** 掩码后的 AUD，仅供核对 */
+  accessAud: string | null
+  tokenFallback: boolean
+  tokenSet: boolean
+  sessionExpiresAt: number | null
 }
 
 /** 动态页按天分组的当日金额合计（USD 毫，退款已抵扣，可为负） */

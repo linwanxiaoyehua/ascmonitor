@@ -14,30 +14,81 @@ import { createWebhook, deleteWebhook, loadAscCredentials, postReviewResponse } 
 import { describeState, type BuildScope } from '../lib/build-status'
 import { enrichApp, type AppLite } from '../lib/app-enrich'
 import { decodeJwsPayload, type RenewalInfo, type TransactionInfo } from '../lib/assn'
+import { authenticate, authStatus, rotateToken, type AuthMethod } from '../lib/auth'
 
-export const api = new Hono<{ Bindings: Env }>()
+export const api = new Hono<{ Bindings: Env; Variables: { authMethod: AuthMethod } }>()
 
-// Bearer token 鉴权（token 存 config.access_token，首次通过 setup 生成）
+// 鉴权：Cloudflare Access 优先，Access Token 兜底（见 lib/auth 的迁移策略）
 api.use('*', async (c, next) => {
-  const row = await c.env.DB.prepare("SELECT value FROM config WHERE key = 'access_token'").first<{ value: string }>()
-  if (!row) {
-    // 未初始化时仅放行 setup
-    if (c.req.path.endsWith('/setup')) return next()
-    return c.json({ error: 'not_initialized' }, 401)
+  const result = await authenticate(c.env.DB, c.req.raw)
+  if (result.ok) {
+    c.set('authMethod', result.method!)
+    return next()
   }
-  const auth = c.req.header('Authorization')
-  if (auth !== `Bearer ${row.value}`) return c.json({ error: 'unauthorized' }, 401)
-  return next()
+  // 未初始化时仅放行 setup
+  if (result.reason === 'not_initialized' && c.req.path.endsWith('/setup')) return next()
+  if (result.reason === 'locked') {
+    return c.json({ error: 'too_many_attempts' }, 429, {
+      'Retry-After': String(Math.ceil((result.retryAfterMs ?? 0) / 1000)),
+    })
+  }
+  return c.json({ error: result.reason === 'not_initialized' ? 'not_initialized' : 'unauthorized' }, 401)
 })
 
 // 首次初始化：生成 access token（只能执行一次）
 api.post('/setup', async (c) => {
-  const existing = await c.env.DB.prepare("SELECT value FROM config WHERE key = 'access_token'").first()
+  const existing = await c.env.DB.prepare(
+    "SELECT value FROM config WHERE key IN ('access_token', 'access_token_sha256')"
+  ).first()
   if (existing) return c.json({ error: 'already_initialized' }, 409)
-  const token = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('')
-  await c.env.DB.prepare("INSERT INTO config (key, value) VALUES ('access_token', ?)").bind(token).run()
-  return c.json({ token })
+  return c.json({ token: await rotateToken(c.env.DB) })
 })
+
+/* ---------- 登录与安全 ---------- */
+
+// 当前认证状态（不回显任何凭证；aud 只给首尾几位便于核对）
+api.get('/auth/status', async (c) => c.json(await authStatus(c.env.DB, c.req.raw)))
+
+// 配置 Cloudflare Access：团队域名 + 应用 AUD tag。留空即关闭 Access 校验。
+api.put('/auth/access', async (c) => {
+  const body = await c.req.json<{ teamDomain?: string; aud?: string }>()
+  const teamDomain = (body.teamDomain ?? '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  const aud = (body.aud ?? '').trim()
+  if (teamDomain && !/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(teamDomain)) {
+    return c.json({ error: 'bad_team_domain' }, 400)
+  }
+  if (aud && !/^[a-f0-9]{64}$/i.test(aud)) return c.json({ error: 'bad_aud' }, 400)
+  const stmts = [
+    c.env.DB.prepare(
+      "INSERT INTO config (key, value) VALUES ('access_team_domain', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    ).bind(teamDomain),
+    c.env.DB.prepare(
+      "INSERT INTO config (key, value) VALUES ('access_aud', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    ).bind(aud),
+  ]
+  await c.env.DB.batch(stmts)
+  return c.json(await authStatus(c.env.DB, c.req.raw))
+})
+
+/**
+ * token 兜底开关。关闭前必须确认「当前这次请求本身就是 Access 认证的」——
+ * 否则 Access 还没真正生效就关掉 token，等于把自己锁在门外。
+ */
+api.put('/auth/token-fallback', async (c) => {
+  const { enabled } = await c.req.json<{ enabled: boolean }>()
+  if (!enabled && c.get('authMethod') !== 'access') {
+    return c.json({ error: 'access_not_active' }, 409)
+  }
+  await c.env.DB.prepare(
+    "INSERT INTO config (key, value) VALUES ('auth_token_fallback', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  )
+    .bind(enabled ? 'on' : 'off')
+    .run()
+  return c.json(await authStatus(c.env.DB, c.req.raw))
+})
+
+// 轮换 token（旧的立即失效）；明文只在这一次响应里出现
+api.post('/auth/rotate-token', async (c) => c.json({ token: await rotateToken(c.env.DB) }))
 
 api.get('/apps', async (c) => {
   const rows = await c.env.DB.prepare('SELECT * FROM apps ORDER BY id').all()
@@ -769,14 +820,25 @@ api.get('/alerts/events', async (c) => {
 })
 
 // 配置管理（ASC 凭证、Telegram、汇率、App 的 asc_app_id 等）
+// 鉴权相关的键一律不经这条通用路径：读会泄露凭证，写能绕过 /auth/* 的安全检查
+// （比如直接把 auth_token_fallback 改回 on，或塞一个自己知道的 token 哈希）
+const AUTH_KEYS = new Set([
+  'access_token',
+  'access_token_sha256',
+  'access_team_domain',
+  'access_aud',
+  'auth_token_fallback',
+  'auth_fail_state',
+])
+
 api.get('/config', async (c) => {
-  const rows = await c.env.DB.prepare("SELECT key FROM config WHERE key != 'access_token'").all<{ key: string }>()
-  return c.json(rows.results.map((r) => r.key)) // 只暴露 key，不回读敏感值
+  const rows = await c.env.DB.prepare('SELECT key FROM config').all<{ key: string }>()
+  return c.json(rows.results.map((r) => r.key).filter((k) => !AUTH_KEYS.has(k))) // 只暴露 key，不回读敏感值
 })
 
 api.put('/config/:key', async (c) => {
   const key = c.req.param('key')
-  if (key === 'access_token') return c.json({ error: 'forbidden' }, 403)
+  if (AUTH_KEYS.has(key)) return c.json({ error: 'forbidden' }, 403)
   const { value } = await c.req.json<{ value: string }>()
   await c.env.DB.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .bind(key, value)
